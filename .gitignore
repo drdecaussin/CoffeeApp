@@ -1,0 +1,6 @@
+ShotLog.xcodeproj/
+build/
+DerivedData/
+*.ipa
+Payload/
+.DS_Store
