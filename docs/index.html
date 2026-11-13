@@ -243,8 +243,7 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
         <div class="live" id="live-roast"></div>
         <div class="photo-pick" id="bag-pick" hidden>
           <img id="bag-prev" class="bagimg" alt="Bag of beans" hidden>
-          <span class="btn filebtn" id="bag-btn">Add bag photo<input type="file" id="f-bag" accept="image/*"></span>
-          <span class="muted" style="font-size:13px" id="bag-note">Saved with this bean, so you only take it once.</span>
+          <span class="muted" style="font-size:13px" id="bag-note">Bag photo, saved with this bean. Scan the bag again to replace it.</span>
         </div>
         <div class="dial" id="dial" hidden></div>
       </div>
@@ -496,24 +495,15 @@ $('#f-photo').addEventListener('change', async e => {
   pendingPhoto = {blob, thumb: await shrink(blob, 240, 0.7), url: URL.createObjectURL(blob)};
   showPhoto(pendingPhoto.url); e.target.value = ''; touched = true;
 });
-$('#f-bag').addEventListener('change', async e => {
-  const f = e.target.files?.[0]; if (!f) return;
-  const blob = await shrink(f);
-  if (pendingBag) URL.revokeObjectURL(pendingBag.url);
-  pendingBag = {blob, url: URL.createObjectURL(blob), key: beanKey($('#f-roaster').value, $('#f-bean').value)};
-  e.target.value = ''; renderBag();
-});
 function renderBag(){
   const f = readForm(), key = beanKey(f.roaster, f.bean), has = !!(f.roaster || f.bean);
-  $('#bag-pick').hidden = !has;
-  if (!has) return;
+  if (!has){ $('#bag-pick').hidden = true; return; }
   if (pendingBag && pendingBag.key !== key){ URL.revokeObjectURL(pendingBag.url); pendingBag = null; }
   const bag = bagOf(key);
   $('#bag-prev').hidden = !pendingBag && !bag;
   if (pendingBag){ $('#bag-prev').removeAttribute('data-gh'); $('#bag-prev').src = pendingBag.url; }
   else if (bag && $('#bag-prev').dataset.gh !== bag){ $('#bag-prev').dataset.gh = bag; delete $('#bag-prev').dataset.ghDone; $('#bag-prev').removeAttribute('src'); hydrate($('#bag-pick')); }
-  const src = pendingBag || bag;
-  $('#bag-btn').firstChild.textContent = src ? 'Replace bag photo' : 'Add bag photo';
+  $('#bag-pick').hidden = !(pendingBag || bag);
 }
 function showPhoto(src){
   $('#photo-prev').hidden = !src; if (src) $('#photo-prev').src = src;
