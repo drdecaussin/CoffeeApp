@@ -47,6 +47,8 @@ h3{font-size:15px;font-weight:600;font-family:var(--f-body)}
 .muted{color:var(--muted)}
 .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
 button,input,select,textarea{font:inherit;color:inherit}
+input[type=date],input[type=datetime-local]{-webkit-appearance:none;appearance:none;min-width:0;width:100%;max-width:100%;box-sizing:border-box;display:block;min-height:44px;text-align:left}
+input::-webkit-date-and-time-value{text-align:left}
 button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
@@ -87,6 +89,15 @@ textarea{min-height:70px;resize:vertical}
 .timer{display:flex;gap:10px;align-items:stretch}
 .timer button.go{flex:0 0 auto;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-weight:600;padding:0 18px;min-width:96px}
 .timer button.go.running{background:var(--dry);color:#fff}
+.timer button.drip{flex:0 0 auto;border:1px solid var(--line);border-radius:10px;background:var(--soft);color:var(--ink);font-weight:600;padding:0 12px;min-width:84px}
+.timer button.drip:disabled{opacity:.45}
+.cl-sum{display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:14px}
+.cl-sum .m{color:var(--muted);text-align:right;font-family:var(--f-mono);font-size:13px}
+.cl-sum .due{color:var(--dry)}
+.cl-list{display:flex;flex-direction:column}
+.cl-item{display:flex;gap:10px;align-items:flex-start;border-top:1px solid var(--line);padding:8px 0;font-size:14px}
+.cl-item > div{flex:1;min-width:0}
+.cl-item .s{color:var(--muted);font-size:12px}
 .timer .clock{flex:1;display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:30px;font-weight:600;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px;min-width:0}
 
 .dial{border:1px dashed var(--accent);background:var(--accent-soft);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px;font-size:14px}
@@ -228,10 +239,8 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
         <div class="f" style="font-size:13px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;gap:6px">Roast
           <div class="chips" id="c-roast"></div>
         </div>
-        <div class="row">
-          <label class="f">Roast date <span class="unit">from the bag</span><input type="date" id="f-roastdate"></label>
-          <div style="display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:12px;min-width:0"><div class="live" id="live-roast"></div></div>
-        </div>
+        <label class="f">Roast date <span class="unit">from the bag</span><input type="date" id="f-roastdate"></label>
+        <div class="live" id="live-roast"></div>
         <div class="photo-pick" id="bag-pick" hidden>
           <img id="bag-prev" class="bagimg" alt="Bag of beans" hidden>
           <span class="btn filebtn" id="bag-btn">Add bag photo<input type="file" id="f-bag" accept="image/*"></span>
@@ -267,6 +276,7 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
         <header><h2>Extraction</h2></header>
         <div class="timer">
           <button type="button" class="go" id="timer-btn">Start</button>
+          <button type="button" class="drip" id="drip-btn" disabled>First drip</button>
           <div class="clock" id="clock">0.0</div>
         </div>
         <div class="row">
@@ -274,6 +284,11 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
             <div class="stepper"><button type="button" data-for="f-time" data-step="-1" aria-label="Less">−</button><input class="n" id="f-time" inputmode="decimal"><button type="button" data-for="f-time" data-step="1" aria-label="More">+</button></div></label>
           <label class="f">Espresso out <span class="unit">g in cup</span>
             <div class="stepper"><button type="button" data-for="f-yield" data-step="-1" aria-label="Less">−</button><input class="n" id="f-yield" inputmode="decimal"><button type="button" data-for="f-yield" data-step="1" aria-label="More">+</button></div></label>
+        </div>
+        <div class="row">
+          <label class="f">First drip <span class="unit">seconds after start</span>
+            <div class="stepper"><button type="button" data-for="f-drip" data-step="-1" aria-label="Less">−</button><input class="n" id="f-drip" inputmode="decimal"><button type="button" data-for="f-drip" data-step="1" aria-label="More">+</button></div></label>
+          <div></div>
         </div>
         <div class="live" id="live-ext"></div>
       </div>
@@ -299,17 +314,32 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
       </div>
 
       <div class="card">
-        <details class="more" id="more">
-          <summary>Machine and date</summary>
-          <div class="view" style="gap:10px">
-            <label class="f">Machine<input type="text" id="f-machine" list="dl-machine" autocomplete="off"></label>
-            <label class="f">When<input type="datetime-local" id="f-when"></label>
-          </div>
-        </details>
+        <header><h2>Machine</h2><span class="muted" style="font-size:13px">carries over from your last shot</span></header>
+        <label class="f">Machine<input type="text" id="f-machine" list="dl-machine" autocomplete="off"></label>
+        <div class="row">
+          <label class="f">Brew temperature <span class="unit">as set on the machine</span>
+            <div class="stepper"><button type="button" data-for="f-temp" data-step="-1" aria-label="Lower">−</button><input class="n" id="f-temp" inputmode="decimal"><button type="button" data-for="f-temp" data-step="1" aria-label="Higher">+</button></div></label>
+          <label class="f">Unit <span class="unit">&nbsp;</span>
+            <select id="f-tempunit"><option value="F">°F</option><option value="C">°C</option></select></label>
+        </div>
+        <label class="f">When<input type="datetime-local" id="f-when"></label>
       </div>
 
       <button class="btn primary save" type="submit" id="save-btn">Save shot</button>
     </form>
+
+    <div class="card" id="clean-card">
+      <header><h2>Cleaning</h2><span class="muted" style="font-size:13px" id="cl-machine"></span></header>
+      <div class="cl-sum" id="cl-sum"></div>
+      <div id="cl-form" class="view" style="gap:10px" hidden>
+        <div class="chips multi" id="c-clean"></div>
+        <label class="f">When<input type="date" id="cl-date"></label>
+        <label class="f">Notes <span class="unit">optional</span><input type="text" id="cl-notes" placeholder="e.g. used Cafiza, 5 cycles"></label>
+        <div style="display:flex;gap:8px"><button type="button" class="btn primary" id="cl-save">Save cleaning</button><button type="button" class="btn" id="cl-cancel">Cancel</button></div>
+      </div>
+      <div><button type="button" class="btn" id="cl-open">Log a cleaning</button></div>
+      <div class="cl-list" id="cl-list"></div>
+    </div>
     <datalist id="dl-roaster"></datalist><datalist id="dl-bean"></datalist><datalist id="dl-machine"></datalist>
   </section>
 
@@ -438,9 +468,13 @@ let t0 = null, raf = null;
 function tick(){ $('#clock').textContent = ((performance.now()-t0)/1000).toFixed(1); raf = requestAnimationFrame(tick); }
 $('#timer-btn').addEventListener('click', () => {
   const b = $('#timer-btn');
-  if (t0 == null){ t0 = performance.now(); b.textContent = 'Stop'; b.classList.add('running'); tick(); }
-  else { cancelAnimationFrame(raf); const s = (performance.now()-t0)/1000; t0 = null; $('#clock').textContent = s.toFixed(1);
+  if (t0 == null){ t0 = performance.now(); b.textContent = 'Stop'; b.classList.add('running'); $('#drip-btn').disabled = false; $('#f-drip').value = ''; tick(); }
+  else { cancelAnimationFrame(raf); const s = (performance.now()-t0)/1000; t0 = null; $('#clock').textContent = s.toFixed(1); $('#drip-btn').disabled = true;
     $('#f-time').value = s.toFixed(1); b.textContent = 'Start'; b.classList.remove('running'); touched = true; onFormChange('f-time'); }
+});
+$('#drip-btn').addEventListener('click', () => {
+  if (t0 == null) return;
+  $('#f-drip').value = ((performance.now()-t0)/1000).toFixed(1); $('#drip-btn').disabled = true; touched = true; onFormChange('f-drip');
 });
 
 /* ---------- photo ---------- */
@@ -495,7 +529,8 @@ function readForm(){
     roaster: $('#f-roaster').value.trim(), bean: $('#f-bean').value.trim(),
     roast: getChip('#c-roast'), roastDate: $('#f-roastdate').value || null,
     grind: num('#f-grind'), innerBurr: num('#f-burr'), doseIn: num('#f-dose'), groundOut: num('#f-ground'),
-    time: num('#f-time'), yieldOut: num('#f-yield'),
+    time: num('#f-time'), drip: num('#f-drip'), yieldOut: num('#f-yield'),
+    temp: num('#f-temp'), tempUnit: num('#f-temp') != null ? $('#f-tempunit').value : null,
     puck: getChip('#c-puck'), taste: getChip('#c-taste'), drink: getChip('#c-drink'),
     basket: getChip('#c-basket'), prep: getPrep(), issues: getIssues(),
     notes: $('#f-notes').value.trim()
@@ -508,12 +543,13 @@ function fillSettings(s, full){
   setVal('#f-roastdate', s.roastDate); setVal('#f-grind', s.grind); setVal('#f-burr', s.innerBurr);
   setVal('#f-dose', s.doseIn != null ? (+s.doseIn).toFixed(1) : ''); setChip('#c-drink', s.drink);
   setChip('#c-basket', s.basket); setPrep(s.prep);
+  setVal('#f-temp', s.temp); if (s.tempUnit) $('#f-tempunit').value = s.tempUnit;
   groundEdited = !!full && s.groundOut != null;
   if (full){
-    setVal('#f-ground', s.groundOut != null ? (+s.groundOut).toFixed(1) : ''); setVal('#f-time', s.time); setVal('#f-yield', s.yieldOut);
+    setVal('#f-ground', s.groundOut != null ? (+s.groundOut).toFixed(1) : ''); setVal('#f-time', s.time); setVal('#f-drip', s.drip); setVal('#f-yield', s.yieldOut);
     setChip('#c-puck', s.puck); setChip('#c-taste', s.taste); setIssues(s.issues); setVal('#f-notes', s.notes);
   } else {
-    ['#f-ground','#f-time','#f-yield','#f-notes'].forEach(i => setVal(i,'')); setChip('#c-puck',null); setChip('#c-taste',null); setIssues([]);
+    ['#f-ground','#f-time','#f-drip','#f-yield','#f-notes'].forEach(i => setVal(i,'')); setChip('#c-puck',null); setChip('#c-taste',null); setIssues([]);
   }
 }
 function resetForm(){
@@ -538,6 +574,7 @@ function syncGround(id){
 }
 function onFormChange(id){
   syncGround(id);
+  if (!id || id === 'f-machine') renderCleaning();
   const f = readForm();
   // live grind line
   const g = [];
@@ -547,6 +584,7 @@ function onFormChange(id){
   const r = ratio(f);
   if (r) x.push(`Ratio <b>1 : ${r.toFixed(1)}</b>`);
   if (f.doseIn) x.push(`Target 1:2 = <b>${fmt1(f.doseIn*2)} g</b>`);
+  if (f.drip != null) x.push(f.drip < 5 ? `<span style="color:var(--soupy)">First drip at ${fmt1(f.drip)} s is early: grind may be coarse or the puck channeling</span>` : f.drip > 12 ? `<span style="color:var(--dry)">First drip at ${fmt1(f.drip)} s is late: grind may be too fine</span>` : `First drip <b>${fmt1(f.drip)} s</b>`);
   if (f.time != null) x.push(f.time < 25 ? `<span style="color:var(--soupy)">Fast for a 1:2 shot</span>` : f.time > 33 ? `<span style="color:var(--dry)">Slow for a 1:2 shot</span>` : `<span style="color:var(--firm)">In the 25–33 s window</span>`);
   $('#live-ext').innerHTML = x.join('');
   const dOff = daysOff($('#f-roastdate').value, $('#f-when').value || new Date());
@@ -674,6 +712,53 @@ $('#form').addEventListener('submit', async e => {
   } finally { btn.disabled = false; if (!editingId) btn.textContent = 'Save shot'; }
 });
 
+/* ---------- cleaning log ---------- */
+const CLEANS = ['Backflush, water', 'Backflush, cleaning tablet', 'Descale', 'Shower screen', 'Steam wand', 'Grinder burrs', 'Water filter changed'];
+(() => { const box = $('#c-clean');
+  box.innerHTML = CLEANS.map(v => `<button type="button" class="chip" data-v="${esc(v)}" aria-pressed="false">${esc(v)}</button>`).join('');
+  box.addEventListener('click', e => { const b = e.target.closest('button'); if (b) b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); });
+})();
+const cleanings = () => [...(store.data.cleanings || [])].sort((a, b) => b.date < a.date ? -1 : b.date > a.date ? 1 : 0);
+function renderCleaning(){
+  const machine = $('#f-machine').value.trim() || DEFAULT_MACHINE, mk = machine.toLowerCase();
+  const list = cleanings().filter(c => (c.machine || DEFAULT_MACHINE).toLowerCase() === mk);
+  $('#cl-machine').textContent = machine;
+  const today = new Date(localDate(new Date()) + 'T00:00');
+  const rows = CLEANS.map(k => {
+    const last = list.find(c => (c.kinds || []).includes(k)); if (!last) return '';
+    const days = Math.round((today - new Date(last.date + 'T00:00')) / 864e5);
+    const since = shots.filter(s => !s.example && (s.machine || DEFAULT_MACHINE).toLowerCase() === mk && s.date > last.date).length;
+    return `<div>${esc(k)}</div><div class="m">${days === 0 ? 'today' : days === 1 ? '1 day ago' : days + ' days ago'} · ${since} shot${since === 1 ? '' : 's'} since</div>`;
+  }).join('');
+  $('#cl-sum').innerHTML = rows || '<div class="muted" style="grid-column:1/-1">No cleanings logged for this machine yet. Log one each time you backflush, descale or clean the grinder, and it shows how long it’s been.</div>';
+  $('#cl-list').innerHTML = list.slice(0, 20).map(c => `<div class="cl-item"><div><div>${esc((c.kinds || []).join(', '))}</div><div class="s">${esc(new Date(c.date + 'T00:00').toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'}))}${c.notes ? ' · ' + esc(c.notes) : ''}</div></div><button type="button" class="btn small" data-cl-del="${esc(c.id)}">Delete</button></div>`).join('');
+}
+$('#cl-open').addEventListener('click', () => {
+  $('#cl-form').hidden = false; $('#cl-open').hidden = true; $('#cl-date').value = localDate(new Date()); $('#cl-notes').value = '';
+  $('#c-clean').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', 'false'));
+});
+$('#cl-cancel').addEventListener('click', () => { $('#cl-form').hidden = true; $('#cl-open').hidden = false; });
+$('#cl-save').addEventListener('click', async () => {
+  if (!connected){ toast('Connect your GitHub data repo first. Tap the status at the top.'); return; }
+  const kinds = [...$('#c-clean').querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.v);
+  if (!kinds.length){ toast('Pick what you cleaned.'); return; }
+  const doc = {id: newId(), date: $('#cl-date').value || localDate(new Date()), machine: $('#f-machine').value.trim() || DEFAULT_MACHINE, kinds, notes: $('#cl-notes').value.trim()};
+  const btn = $('#cl-save'); btn.disabled = true;
+  try {
+    setSync('busy');
+    await store.change('Log cleaning', data => { (data.cleanings ||= []).push(doc); });
+    setSync('ok'); toast('Cleaning saved'); $('#cl-form').hidden = true; $('#cl-open').hidden = false; renderCleaning();
+  } catch (err){ toast(`Couldn’t save (${errText(err)}). Check your connection and try again.`); setSync('bad', 'Not saved'); }
+  finally { btn.disabled = false; }
+});
+$('#cl-list').addEventListener('click', async e => {
+  const b = e.target.closest('[data-cl-del]'); if (!b) return;
+  if (b.dataset.confirm !== '1'){ b.dataset.confirm = '1'; b.textContent = 'Tap to confirm'; setTimeout(() => { b.dataset.confirm = ''; b.textContent = 'Delete'; }, 3000); return; }
+  const id = b.dataset.clDel;
+  try { setSync('busy'); await store.change('Delete cleaning', data => { data.cleanings = (data.cleanings || []).filter(c => c.id !== id); }); setSync('ok'); renderCleaning(); }
+  catch (err){ toast(`Couldn’t delete (${errText(err)}).`); setSync('bad', 'Not saved'); }
+});
+
 /* ---------- history ---------- */
 function thumb(s){
   if (s.photo) return `<img class="thumb" data-gh="${esc(s.thumb || s.photo)}" alt="">`;
@@ -708,11 +793,11 @@ $('#h-list').addEventListener('click', e => { const b = e.target.closest('.shot'
 function openSheet(id){
   const s = shots.find(x => x.id === id); if (!s) return;
   const kv = [['Grind', s.grind], ['Inner burr', s.innerBurr], ['Beans in', s.doseIn != null ? fmt1(s.doseIn)+' g' : null],
-    ['Out of grinder', s.groundOut != null ? fmt1(s.groundOut)+' g' : null], ['Time', s.time != null ? fmt1(s.time)+' s' : null],
+    ['Out of grinder', s.groundOut != null ? fmt1(s.groundOut)+' g' : null], ['Time', s.time != null ? fmt1(s.time)+' s' : null], ['First drip', s.drip != null ? fmt1(s.drip)+' s' : null],
     ['Espresso out', s.yieldOut != null ? fmt1(s.yieldOut)+' g' : null], ['Ratio', ratio(s) ? '1:'+ratio(s).toFixed(1) : null],
     ['Puck', s.puck ? PUCKS[s.puck] : null], ['Taste', s.taste ? TASTES[s.taste] : null], ['Basket', s.basket],
     ['Shot problems', (s.issues||[]).length ? s.issues.map(i => ISSUES[i] || i).join(', ') : null], ['Puck prep', (s.prep||[]).length ? s.prep.join(', ') : null], ['Roast', s.roast], ['Roast date', s.roastDate],
-    ['Days off roast', daysOff(s.roastDate, s.ts)], ['Machine', s.machine]];
+    ['Days off roast', daysOff(s.roastDate, s.ts)], ['Machine', s.machine], ['Brew temp', s.temp != null ? fmt1(s.temp)+' °'+(s.tempUnit||'') : null]];
   const bag = bagOf(beanKey(s.roaster, s.bean));
   $('#sheet-panel').innerHTML = `
     <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
@@ -821,7 +906,7 @@ function scatter(list){
 
 /* ---------- export ---------- */
 function toCSV(){
-  const cols = ['ts','machine','roaster','bean','roast','roastDate','daysOffRoast','grind','innerBurr','doseIn','groundOut','time','yieldOut','ratio','puck','issues','taste','basket','prep','drink','notes'];
+  const cols = ['ts','machine','roaster','bean','roast','roastDate','daysOffRoast','grind','innerBurr','doseIn','groundOut','drip','time','yieldOut','temp','tempUnit','ratio','puck','issues','taste','basket','prep','drink','notes'];
   const cell = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
   const rows = [...shots].filter(s => !s.example).reverse().map(s => cols.map(c =>
     c === 'ratio' ? (ratio(s) ? ratio(s).toFixed(2) : '') : c === 'prep' ? (s.prep||[]).join('; ') : c === 'issues' ? (s.issues||[]).join('; ') : c === 'daysOffRoast' ? daysOff(s.roastDate, s.ts) : s[c]).map(cell).join(','));
@@ -854,7 +939,7 @@ function renderAll(){
   datalists();
   const hasEx = shots.some(s => s.example);
   $$('.ex-banner').forEach(b => b.hidden = !hasEx);
-  renderHistory(); renderStats(); renderDial(); renderBag(); hydrate();
+  renderHistory(); renderStats(); renderDial(); renderBag(); renderCleaning(); hydrate();
 }
 function route(){
   const setup = !store.cfg?.token;
