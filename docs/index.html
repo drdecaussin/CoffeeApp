@@ -281,6 +281,9 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
       <div class="card">
         <header><h2>Puck &amp; cup</h2></header>
         <div class="puckchips" id="c-puck"></div>
+        <div class="f" style="font-size:13px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;gap:6px">Shot problems <span class="unit" style="margin-top:-4px">tick any that happened</span>
+          <div class="chips multi" id="c-issues"></div>
+        </div>
         <div class="f" style="font-size:13px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;gap:6px">Taste <span class="unit" style="margin-top:-4px">optional, helps the suggestions</span>
           <div class="chips" id="c-taste"></div>
         </div>
@@ -362,6 +365,7 @@ const DRINKS = ['Espresso','Double','Americano','Latte','Cappuccino','Flat white
 const DEFAULT_MACHINE = 'Breville Barista Pro';
 const BASKETS = ['Single','Double','Single, pressurized','Double, pressurized'];
 const PREPS = ['WDT','Distributor','Dosing funnel','Puck screen','Paper filter'];
+const ISSUES = {channeling: 'Channeling', spraying: 'Spraying out the bottom', choked: 'Choked (little or nothing came out)'};
 
 let shots = [], editingId = null, touched = false, prefilled = false, connected = false;
 let pendingPhoto = null, keepPhoto = null, pendingBag = null, bags = {};
@@ -403,6 +407,12 @@ makeChips('#c-basket', Object.fromEntries(BASKETS.map(r=>[r,r])), 'chip');
   box.innerHTML = PREPS.map(v => `<button type="button" class="chip" data-v="${esc(v)}" aria-pressed="false">${esc(v)}</button>`).join('');
   box.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); touched = true; });
 })();
+(() => { const box = $('#c-issues');
+  box.innerHTML = Object.entries(ISSUES).map(([v, l]) => `<button type="button" class="chip" data-v="${v}" aria-pressed="false">${esc(l)}</button>`).join('');
+  box.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); touched = true; });
+})();
+const getIssues = () => [...$('#c-issues').querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.v);
+const setIssues = arr => $('#c-issues').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((arr||[]).includes(b.dataset.v))));
 const getPrep = () => [...$('#c-prep').querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.v);
 const setPrep = arr => $('#c-prep').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((arr||[]).includes(b.dataset.v))));
 makeChips('#c-taste', TASTES, 'chip');
@@ -487,7 +497,7 @@ function readForm(){
     grind: num('#f-grind'), innerBurr: num('#f-burr'), doseIn: num('#f-dose'), groundOut: num('#f-ground'),
     time: num('#f-time'), yieldOut: num('#f-yield'),
     puck: getChip('#c-puck'), taste: getChip('#c-taste'), drink: getChip('#c-drink'),
-    basket: getChip('#c-basket'), prep: getPrep(),
+    basket: getChip('#c-basket'), prep: getPrep(), issues: getIssues(),
     notes: $('#f-notes').value.trim()
   };
 }
@@ -501,9 +511,9 @@ function fillSettings(s, full){
   groundEdited = !!full && s.groundOut != null;
   if (full){
     setVal('#f-ground', s.groundOut != null ? (+s.groundOut).toFixed(1) : ''); setVal('#f-time', s.time); setVal('#f-yield', s.yieldOut);
-    setChip('#c-puck', s.puck); setChip('#c-taste', s.taste); setVal('#f-notes', s.notes);
+    setChip('#c-puck', s.puck); setChip('#c-taste', s.taste); setIssues(s.issues); setVal('#f-notes', s.notes);
   } else {
-    ['#f-ground','#f-time','#f-yield','#f-notes'].forEach(i => setVal(i,'')); setChip('#c-puck',null); setChip('#c-taste',null);
+    ['#f-ground','#f-time','#f-yield','#f-notes'].forEach(i => setVal(i,'')); setChip('#c-puck',null); setChip('#c-taste',null); setIssues([]);
   }
 }
 function resetForm(){
@@ -558,6 +568,7 @@ function score(s){
   if (s.taste === 'balanced') p += 2; else if (s.taste) p -= 1;
   const r = ratio(s); if (r && r >= 1.8 && r <= 2.5) p += 1;
   if (s.puck === 'soupy') p -= 2;
+  p -= 2 * (s.issues || []).length;
   return p;
 }
 function bestOf(list){ let b = null, bs = -99; for (const s of list){ const sc = score(s); if (sc > bs){ bs = sc; b = s; } } return bs >= 3 ? b : null; }
@@ -565,7 +576,16 @@ function suggest(s){
   if (!s) return null;
   let g = s.grind, d = s.doseIn, why;
   const t = s.time, fast = t != null && t < 25, slow = t != null && t > 33;
-  if (s.puck === 'soupy'){
+  const iss = s.issues || [], hasPrep = p => (s.prep || []).includes(p);
+  if (iss.includes('choked')){ g = g != null ? g + 3 : g; why = 'Choked shot: the grind was too fine for the water to push through. Grind 3 steps coarser.' + ((s.doseIn || 0) > 18.5 ? ' Also try a gram less in the basket.' : ''); }
+  else if (iss.includes('channeling') || iss.includes('spraying')){
+    const fix = !hasPrep('WDT') ? 'Stir the grounds with a WDT tool before tamping' : 'Stir more thoroughly with WDT, all the way to the bottom of the basket';
+    why = `${iss.includes('spraying') ? 'Spraying out the bottom' : 'Channeling'} means water found a weak spot in the puck. ${fix}, and tamp level.`;
+    if (fast){ g = g != null ? g - 1 : g; why += ' It also ran fast, so grind 1 step finer.'; }
+    else if (slow){ g = g != null ? g + 1 : g; why += ' It also ran slow, and a very fine grind makes spraying worse, so grind 1 step coarser.'; }
+    else if (s.puck === 'soupy'){ d = d != null ? d + 0.5 : d; why += ' The soupy puck points to too little coffee too, so add 0.5 g.'; }
+  }
+  else if (s.puck === 'soupy'){
     if (fast){ g = g != null ? g - 2 : g; why = 'Soupy puck and a fast shot. Grind 2 steps finer.'; }
     else { d = d != null ? d + 0.5 : d; why = 'Soupy puck means too much headspace above the coffee. Add 0.5 g to the basket.'; }
   } else if (s.puck === 'wet'){
@@ -678,7 +698,7 @@ function renderHistory(){
   box.innerHTML = [...days].map(([d, arr]) => `<div class="day"><div class="eyebrow">${esc(fmtDay(arr[0].ts))}</div>${arr.map(s => `
     <button class="shot" type="button" data-id="${esc(s.id)}">${thumb(s)}
       <div><div class="t">${esc(s.drink || 'Shot')} · ${esc(beanName(s))}</div><div class="k">${esc(shotLine(s))}</div><div class="s">${esc(fmtTime(s.ts))}${s.machine && s.machine !== DEFAULT_MACHINE ? ' · ' + esc(s.machine) : ''}</div></div>
-      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${s.puck ? `<span class="tag p-${s.puck}">${PUCKS[s.puck]}</span>` : ''}${s.example ? '<span class="tag ex">Example</span>' : ''}</div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${s.puck ? `<span class="tag p-${s.puck}">${PUCKS[s.puck]}</span>` : ''}${(s.issues||[]).map(i => `<span class="tag p-${i === 'choked' ? 'dry' : 'soupy'}">${i === 'choked' ? 'Choked' : i === 'spraying' ? 'Spraying' : 'Channeling'}</span>`).join('')}${s.example ? '<span class="tag ex">Example</span>' : ''}</div>
     </button>`).join('')}</div>`).join('');
 }
 $('#h-bean').addEventListener('change', () => { renderHistory(); hydrate(); });
@@ -691,7 +711,7 @@ function openSheet(id){
     ['Out of grinder', s.groundOut != null ? fmt1(s.groundOut)+' g' : null], ['Time', s.time != null ? fmt1(s.time)+' s' : null],
     ['Espresso out', s.yieldOut != null ? fmt1(s.yieldOut)+' g' : null], ['Ratio', ratio(s) ? '1:'+ratio(s).toFixed(1) : null],
     ['Puck', s.puck ? PUCKS[s.puck] : null], ['Taste', s.taste ? TASTES[s.taste] : null], ['Basket', s.basket],
-    ['Puck prep', (s.prep||[]).length ? s.prep.join(', ') : null], ['Roast', s.roast], ['Roast date', s.roastDate],
+    ['Shot problems', (s.issues||[]).length ? s.issues.map(i => ISSUES[i] || i).join(', ') : null], ['Puck prep', (s.prep||[]).length ? s.prep.join(', ') : null], ['Roast', s.roast], ['Roast date', s.roastDate],
     ['Days off roast', daysOff(s.roastDate, s.ts)], ['Machine', s.machine]];
   const bag = bagOf(beanKey(s.roaster, s.bean));
   $('#sheet-panel').innerHTML = `
@@ -801,10 +821,10 @@ function scatter(list){
 
 /* ---------- export ---------- */
 function toCSV(){
-  const cols = ['ts','machine','roaster','bean','roast','roastDate','daysOffRoast','grind','innerBurr','doseIn','groundOut','time','yieldOut','ratio','puck','taste','basket','prep','drink','notes'];
+  const cols = ['ts','machine','roaster','bean','roast','roastDate','daysOffRoast','grind','innerBurr','doseIn','groundOut','time','yieldOut','ratio','puck','issues','taste','basket','prep','drink','notes'];
   const cell = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
   const rows = [...shots].filter(s => !s.example).reverse().map(s => cols.map(c =>
-    c === 'ratio' ? (ratio(s) ? ratio(s).toFixed(2) : '') : c === 'prep' ? (s.prep||[]).join('; ') : c === 'daysOffRoast' ? daysOff(s.roastDate, s.ts) : s[c]).map(cell).join(','));
+    c === 'ratio' ? (ratio(s) ? ratio(s).toFixed(2) : '') : c === 'prep' ? (s.prep||[]).join('; ') : c === 'issues' ? (s.issues||[]).join('; ') : c === 'daysOffRoast' ? daysOff(s.roastDate, s.ts) : s[c]).map(cell).join(','));
   return [cols.join(','), ...rows].join('\n');
 }
 $('#export-btn').addEventListener('click', async () => {
