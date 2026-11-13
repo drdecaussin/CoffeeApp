@@ -1,0 +1,1008 @@
+<!doctype html>
+<html lang="en">
+<title>Shot Log</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="apple-mobile-web-app-title" content="Shot Log">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one-column phone app, max 560px, three views (Log / History / Stats) switched by a fixed bottom tab bar. */
+:root{
+  --bg:#F1F1EE; --surface:#FFFFFF; --soft:#E8E5E0; --ink:#1D1916; --muted:#6B625A; --line:#DAD5CE;
+  --accent:#94561C; --accent-ink:#FFFFFF; --accent-soft:#F3E4D3;
+  --soupy:#3A74B0; --wet:#2B8F8F; --firm:#3B8653; --dry:#BC5230; --warn:#9A6A00;
+  --f-display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --f-body:"Inter", -apple-system, system-ui, sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#13100E; --surface:#1D1916; --soft:#2A2420; --ink:#EEE7DE; --muted:#A39789; --line:#352D27;
+  --accent:#E3A25A; --accent-ink:#1A1109; --accent-soft:#3A2A1A;
+  --soupy:#72A9E0; --wet:#5CC3C0; --firm:#6CBF84; --dry:#EA8460; --warn:#E0B44C; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#13100E; --surface:#1D1916; --soft:#2A2420; --ink:#EEE7DE; --muted:#A39789; --line:#352D27;
+  --accent:#E3A25A; --accent-ink:#1A1109; --accent-soft:#3A2A1A;
+  --soupy:#72A9E0; --wet:#5CC3C0; --firm:#6CBF84; --dry:#EA8460; --warn:#E0B44C; color-scheme:dark}
+
+*{box-sizing:border-box}
+html{color-scheme:light;padding-top:env(safe-area-inset-top,0px)}
+img{max-width:100%}
+a{color:var(--accent)}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));-webkit-tap-highlight-color:transparent}
+.wrap{max-width:560px;margin:0 auto;padding-block:16px calc(96px + env(safe-area-inset-bottom, 0px))}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+h1{font-size:28px;font-weight:700}
+h2{font-size:19px;font-weight:700}
+h3{font-size:15px;font-weight:600;font-family:var(--f-body)}
+.mono,.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.muted{color:var(--muted)}
+.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:16px}
+.sync{border:0;background:none;padding:4px 0;cursor:pointer;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;white-space:nowrap}
+.sync i{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
+.sync.ok i{background:var(--firm)} .sync.bad i{background:var(--dry)}
+
+.view{display:flex;flex-direction:column;gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.card > header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.banner{background:var(--accent-soft);border-radius:var(--r);padding:10px 12px;font-size:14px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;color:var(--muted);font-weight:500;min-width:0}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row > *{min-width:0}
+input[type=text],input[type=password],input[type=date],input[type=datetime-local],input.n,select,textarea{
+  width:100%;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 11px;font-size:16px;color:var(--ink);min-width:0}
+textarea{min-height:70px;resize:vertical}
+.stepper{display:grid;grid-template-columns:42px 1fr 42px;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--bg)}
+.stepper button{border:0;background:var(--soft);font-size:20px;line-height:1;color:var(--ink)}
+.stepper button:active{background:var(--line)}
+.stepper input{border:0;border-radius:0;text-align:center;font-family:var(--f-mono);font-size:18px;font-weight:600;background:transparent;padding:10px 4px}
+.unit{font-size:12px;color:var(--muted);font-weight:400}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 12px;font-size:14px;color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.puckchips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.puck{border:1px solid var(--line);background:var(--bg);border-radius:10px;padding:8px 4px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:13px;color:var(--ink)}
+.puck .disc{width:26px;height:26px;border-radius:50%;border:3px solid var(--c);background:color-mix(in srgb, var(--c) 22%, transparent)}
+.puck[aria-pressed="true"]{border-color:var(--c);background:color-mix(in srgb, var(--c) 14%, var(--surface));font-weight:600}
+.p-soupy{--c:var(--soupy)} .p-wet{--c:var(--wet)} .p-firm{--c:var(--firm)} .p-dry{--c:var(--dry)}
+
+.live{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.live b{font-family:var(--f-mono);color:var(--ink);font-weight:600}
+
+.timer{display:flex;gap:10px;align-items:stretch}
+.timer button.go{flex:0 0 auto;border:0;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-weight:600;padding:0 18px;min-width:96px}
+.timer button.go.running{background:var(--dry);color:#fff}
+.timer .clock{flex:1;display:flex;align-items:center;justify-content:center;font-family:var(--f-mono);font-size:30px;font-weight:600;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px;min-width:0}
+
+.dial{border:1px dashed var(--accent);background:var(--accent-soft);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px;font-size:14px}
+.dial .k{font-family:var(--f-mono);font-size:13px}
+.dial .tip{font-weight:600}
+
+.photo-pick{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.bagimg{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.multi .chip[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink);border-color:var(--accent)}
+.photo-pick img{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;font-weight:500;font-size:14px;color:var(--ink)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+.btn.danger{color:var(--dry);border-color:var(--dry)}
+.btn.small{padding:6px 10px;font-size:13px}
+.save{width:100%;padding:14px;font-size:16px}
+.btn:disabled{opacity:.55}
+.filebtn{position:relative;overflow:hidden}
+.filebtn input{position:absolute;inset:0;opacity:0;cursor:pointer}
+
+details.more summary{cursor:pointer;font-size:13px;color:var(--muted);font-weight:500}
+details.more[open] summary{margin-bottom:10px}
+
+/* history */
+.day{display:flex;flex-direction:column;gap:8px}
+.day > .eyebrow{padding-left:2px}
+.shot{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px;text-align:left;width:100%}
+.shot .thumb{width:52px;height:52px;border-radius:50%;object-fit:cover;background:var(--soft)}
+.shot .thumb.disc{border:4px solid var(--c, var(--line));background:color-mix(in srgb, var(--c, var(--line)) 20%, var(--soft))}
+.shot .t{font-weight:600;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shot .s{font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shot .k{font-family:var(--f-mono);font-size:12.5px;color:var(--ink)}
+.shot > div{min-width:0}
+.tag{font-size:12px;font-weight:600;padding:3px 8px;border-radius:999px;color:var(--c);background:color-mix(in srgb, var(--c) 14%, transparent);white-space:nowrap}
+.tag.ex{--c:var(--warn)}
+.empty{text-align:center;padding:28px 16px;color:var(--muted);display:flex;flex-direction:column;gap:10px;align-items:center}
+
+/* stats */
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.tile b{font-family:var(--f-mono);font-size:22px;font-weight:600}
+.tile span{font-size:11.5px;color:var(--muted);line-height:1.25}
+@media (max-width:420px){.tiles{grid-template-columns:repeat(2,1fr)}}
+.best{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.best div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.best b{font-family:var(--f-mono);font-size:18px}
+.best span{font-size:11.5px;color:var(--muted)}
+.chart svg{width:100%;height:auto;display:block}
+.chart text{fill:var(--muted);font-family:var(--f-mono);font-size:10px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c);margin-right:5px;vertical-align:-1px}
+.tablewrap{overflow-x:auto;margin:0 -14px;padding:0 14px}
+table{border-collapse:collapse;width:100%;font-size:13px;min-width:420px}
+th,td{text-align:left;padding:7px 8px 7px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600}
+td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.bars{display:flex;flex-direction:column;gap:6px}
+.bar{display:grid;grid-template-columns:96px 1fr 28px;gap:8px;align-items:center;font-size:13px}
+.bar .track{height:10px;background:var(--soft);border-radius:5px;overflow:hidden}
+.bar .fill{height:100%;background:var(--accent);border-radius:5px}
+.bar .num{text-align:right;color:var(--muted)}
+
+/* tabs */
+.tabs{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);z-index:20;
+  padding:6px max(16px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px))}
+.tabs .in{max-width:560px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tabs a{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px;border-radius:10px;color:var(--muted);text-decoration:none;font-size:12px;font-weight:600}
+.tabs a svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8}
+.tabs a[aria-current="page"]{color:var(--accent);background:var(--accent-soft)}
+
+/* sheet */
+.sheet{position:fixed;inset:0;z-index:30;background:color-mix(in srgb, #000 45%, transparent);display:flex;align-items:flex-end;justify-content:center}
+.sheet .panel{background:var(--surface);width:100%;max-width:560px;max-height:88%;overflow-y:auto;border-radius:18px 18px 0 0;
+  padding:16px max(16px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));display:flex;flex-direction:column;gap:14px}
+.sheet img.big{width:100%;max-height:340px;object-fit:cover;border-radius:var(--r)}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.kv div{display:flex;flex-direction:column;gap:1px;min-width:0}
+.kv span{font-size:11.5px;color:var(--muted)}
+.kv b{font-family:var(--f-mono);font-size:15px;font-weight:600;overflow-wrap:anywhere}
+.actions{display:flex;gap:8px;flex-wrap:wrap}
+
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom, 0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;z-index:40;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:no-preference){.sheet .panel{animation:up .22s ease-out}@keyframes up{from{transform:translateY(30px);opacity:.6}}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow" id="today"></div>
+      <h1>Shot Log</h1>
+    </div>
+    <button class="sync" id="sync" type="button" title="Sync settings"><i></i><span>Connecting…</span></button>
+  </header>
+
+  <!-- SETUP -->
+  <section class="view" id="view-setup" hidden>
+    <div class="card">
+      <header><h2>Connect your log</h2></header>
+      <div style="font-size:14px;display:flex;flex-direction:column;gap:10px">
+        <div>Your shots and photos are saved in your private GitHub repo, so they sync between your phone and computer. Each device needs a key once.</div>
+        <ol style="margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px">
+          <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → new fine-grained token</a>.</li>
+          <li>Name it <b>Shot Log</b> and set <b>Expiration</b> to the longest option.</li>
+          <li>Under <b>Repository access</b> pick <b>Only select repositories</b> and choose your data repo.</li>
+          <li>Under <b>Permissions → Repository permissions</b>, set <b>Contents</b> to <b>Read and write</b>.</li>
+          <li>Tap <b>Generate token</b>, copy it, and paste it below.</li>
+        </ol>
+      </div>
+      <label class="f">Data repo<input type="text" id="g-repo" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="yourname/coffee-data"></label>
+      <label class="f">Key (token)<input type="password" id="g-token" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…"></label>
+      <button class="btn primary save" type="button" id="g-connect">Connect</button>
+      <div class="muted" id="g-msg" style="font-size:13px"></div>
+      <div class="muted" style="font-size:12px">The key stays on this device only. Use the same key on your phone and computer, or make one per device.</div>
+    </div>
+  </section>
+
+  <!-- LOG -->
+  <section class="view" id="view-log">
+    <div class="banner" id="edit-banner" hidden><span>Editing a saved shot</span><button class="btn small" type="button" id="cancel-edit">Cancel edit</button></div>
+    <form id="form" class="view" novalidate>
+      <div class="card">
+        <header><h2>Beans</h2><span class="muted" style="font-size:13px">pick a past bean or type a new one</span></header>
+        <div class="row">
+          <label class="f">Roaster<input type="text" id="f-roaster" list="dl-roaster" autocomplete="off" placeholder="e.g. Onyx"></label>
+          <label class="f">Bean / blend<input type="text" id="f-bean" list="dl-bean" autocomplete="off" placeholder="e.g. Monarch"></label>
+        </div>
+        <div class="f" style="font-size:13px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;gap:6px">Roast
+          <div class="chips" id="c-roast"></div>
+        </div>
+        <div class="row">
+          <label class="f">Roast date <span class="unit">from the bag</span><input type="date" id="f-roastdate"></label>
+          <div style="display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:12px;min-width:0"><div class="live" id="live-roast"></div></div>
+        </div>
+        <div class="photo-pick" id="bag-pick" hidden>
+          <img id="bag-prev" class="bagimg" alt="Bag of beans" hidden>
+          <span class="btn filebtn" id="bag-btn">Add bag photo<input type="file" id="f-bag" accept="image/*"></span>
+          <span class="muted" style="font-size:13px" id="bag-note">Saved with this bean, so you only take it once.</span>
+        </div>
+        <div class="dial" id="dial" hidden></div>
+      </div>
+
+      <div class="card">
+        <header><h2>Grind &amp; dose</h2></header>
+        <div class="row">
+          <label class="f">Grind setting <span class="unit">lower = finer</span>
+            <div class="stepper"><button type="button" data-for="f-grind" data-step="-1" aria-label="Finer">−</button><input class="n" id="f-grind" inputmode="numeric"><button type="button" data-for="f-grind" data-step="1" aria-label="Coarser">+</button></div></label>
+          <label class="f">Beans in <span class="unit">g, weighed</span>
+            <div class="stepper"><button type="button" data-for="f-dose" data-step="-0.1" aria-label="Less">−</button><input class="n" id="f-dose" inputmode="decimal"><button type="button" data-for="f-dose" data-step="0.1" aria-label="More">+</button></div></label>
+        </div>
+        <div class="row">
+          <label class="f">Out of grinder <span class="unit">g, in portafilter</span>
+            <div class="stepper"><button type="button" data-for="f-ground" data-step="-0.1" aria-label="Less">−</button><input class="n" id="f-ground" inputmode="decimal"><button type="button" data-for="f-ground" data-step="0.1" aria-label="More">+</button></div></label>
+          <label class="f">Inner burr <span class="unit">optional</span>
+            <div class="stepper"><button type="button" data-for="f-burr" data-step="-1" aria-label="Lower">−</button><input class="n" id="f-burr" inputmode="numeric"><button type="button" data-for="f-burr" data-step="1" aria-label="Higher">+</button></div></label>
+        </div>
+        <div class="f" style="font-size:13px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;gap:6px">Basket
+          <div class="chips" id="c-basket"></div>
+        </div>
+        <div class="f" style="font-size:13px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;gap:6px">Puck prep <span class="unit" style="margin-top:-4px">tick everything you did</span>
+          <div class="chips multi" id="c-prep"></div>
+        </div>
+        <div class="live" id="live-grind"></div>
+      </div>
+
+      <div class="card">
+        <header><h2>Extraction</h2></header>
+        <div class="timer">
+          <button type="button" class="go" id="timer-btn">Start</button>
+          <div class="clock" id="clock">0.0</div>
+        </div>
+        <div class="row">
+          <label class="f">Extraction time <span class="unit">seconds</span>
+            <div class="stepper"><button type="button" data-for="f-time" data-step="-1" aria-label="Less">−</button><input class="n" id="f-time" inputmode="decimal"><button type="button" data-for="f-time" data-step="1" aria-label="More">+</button></div></label>
+          <label class="f">Espresso out <span class="unit">g in cup</span>
+            <div class="stepper"><button type="button" data-for="f-yield" data-step="-1" aria-label="Less">−</button><input class="n" id="f-yield" inputmode="decimal"><button type="button" data-for="f-yield" data-step="1" aria-label="More">+</button></div></label>
+        </div>
+        <div class="live" id="live-ext"></div>
+      </div>
+
+      <div class="card">
+        <header><h2>Puck &amp; cup</h2></header>
+        <div class="puckchips" id="c-puck"></div>
+        <div class="f" style="font-size:13px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;gap:6px">Taste <span class="unit" style="margin-top:-4px">optional, helps the suggestions</span>
+          <div class="chips" id="c-taste"></div>
+        </div>
+        <div class="f" style="font-size:13px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;gap:6px">Drink made
+          <div class="chips" id="c-drink"></div>
+        </div>
+        <div class="photo-pick" id="photo-pick">
+          <img id="photo-prev" alt="Puck photo preview" hidden>
+          <span class="btn filebtn" id="photo-btn">Add puck photo<input type="file" id="f-photo" accept="image/*"></span>
+          <button type="button" class="btn small" id="photo-clear" hidden>Remove photo</button>
+        </div>
+        <label class="f">Notes<textarea id="f-notes" placeholder="Channeling, crema, what you changed…"></textarea></label>
+      </div>
+
+      <div class="card">
+        <details class="more" id="more">
+          <summary>Machine and date</summary>
+          <div class="view" style="gap:10px">
+            <label class="f">Machine<input type="text" id="f-machine" list="dl-machine" autocomplete="off"></label>
+            <label class="f">When<input type="datetime-local" id="f-when"></label>
+          </div>
+        </details>
+      </div>
+
+      <button class="btn primary save" type="submit" id="save-btn">Save shot</button>
+    </form>
+    <datalist id="dl-roaster"></datalist><datalist id="dl-bean"></datalist><datalist id="dl-machine"></datalist>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="view" id="view-history" hidden>
+    <div class="banner ex-banner" hidden><span>The shots marked <b>Example</b> are samples so you can see how this works.</span><button class="btn small rm-ex" type="button">Remove examples</button></div>
+    <label class="f">Show<select id="h-bean"></select></label>
+    <div id="h-list" class="view"></div>
+  </section>
+
+  <!-- STATS -->
+  <section class="view" id="view-stats" hidden>
+    <div class="banner ex-banner" hidden><span>Stats include the sample <b>Example</b> shots.</span><button class="btn small rm-ex" type="button">Remove examples</button></div>
+    <div class="tiles" id="tiles"></div>
+    <div class="card">
+      <header><h2>Dial-in by bean</h2></header>
+      <label class="f">Bean<select id="s-bean"></select></label>
+      <div id="s-bean-body" class="view" style="gap:12px"></div>
+    </div>
+    <div class="card">
+      <header><h2>All beans</h2></header>
+      <div class="tablewrap"><table id="s-table"></table></div>
+    </div>
+    <div class="card">
+      <header><h2>Drinks</h2></header>
+      <div class="bars" id="s-drinks"></div>
+    </div>
+    <div class="card" id="export-card">
+      <header><h2>Export</h2></header>
+      <div class="muted" style="font-size:14px">Download every shot as a spreadsheet file (CSV) for Excel or Google Sheets.</div>
+      <div><button class="btn" type="button" id="export-btn">Download CSV</button></div>
+    </div>
+  </section>
+</div>
+
+<nav class="tabs" aria-label="Sections"><div class="in">
+  <a href="#log" data-v="log"><svg viewBox="0 0 24 24"><path d="M5 9h11v5a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 10h1.5a2.5 2.5 0 0 1 0 5H16"/><path d="M8 3c0 1.5 1 1.5 1 3M12 3c0 1.5 1 1.5 1 3"/></svg>Log shot</a>
+  <a href="#history" data-v="history"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>History</a>
+  <a href="#stats" data-v="stats"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Stats</a>
+</div></nav>
+
+<div class="sheet" id="sheet" hidden><div class="panel" id="sheet-panel" role="dialog" aria-modal="true"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const PUCKS = {soupy:'Soupy', wet:'Wet', firm:'Firm', dry:'Dry'};
+const PUCK_HINT = {soupy:'water pooled on top', wet:'damp and sloppy', firm:'knocks out whole', dry:'dry or cracked'};
+const TASTES = {sour:'Sour', balanced:'Balanced', bitter:'Bitter'};
+const ROASTS = ['Light','Medium-light','Medium','Medium-dark','Dark'];
+const DRINKS = ['Espresso','Double','Americano','Latte','Cappuccino','Flat white','Cortado','Iced latte','Other'];
+const DEFAULT_MACHINE = 'Breville Barista Pro';
+const BASKETS = ['Single','Double','Single, pressurized','Double, pressurized'];
+const PREPS = ['WDT','Distributor','Dosing funnel','Puck screen','Paper filter'];
+
+let shots = [], editingId = null, touched = false, prefilled = false, connected = false;
+let pendingPhoto = null, keepPhoto = null, pendingBag = null, bags = {};
+
+/* ---------- helpers ---------- */
+const pad = n => String(n).padStart(2,'0');
+const localDate = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const localDT = d => `${localDate(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmt1 = n => n == null || n === '' || !isFinite(n) ? '–' : (+n).toFixed(1).replace(/\.0$/,'');
+const fmtDay = iso => new Date(iso).toLocaleDateString(undefined,{weekday:'short', day:'numeric', month:'short'});
+const fmtTime = iso => new Date(iso).toLocaleTimeString(undefined,{hour:'numeric', minute:'2-digit'});
+const beanKey = (r,b) => `${(r||'').trim().toLowerCase()}|${(b||'').trim().toLowerCase()}`;
+const beanName = s => [s.roaster, s.bean].filter(Boolean).join(' · ') || 'Unnamed bean';
+const ratio = s => (s.doseIn && s.yieldOut) ? s.yieldOut / s.doseIn : null;
+function num(id){ const v = $(id).value.trim().replace(',','.'); if (v === '') return null; const n = parseFloat(v); return isFinite(n) ? n : null; }
+const daysOff = (roastDate, when) => { if (!roastDate) return null; const a = new Date(roastDate + 'T00:00'), b = new Date(when); b.setHours(0,0,0,0); return Math.round((b - a) / 864e5); };
+function beanDocId(key){ let h = 5381; for (const c of key) h = ((h << 5) + h + c.charCodeAt(0)) >>> 0; return 'b-' + key.replace(/[^A-Za-z0-9_\-.~:@+]/g,'_').slice(0,120) + '-' + h.toString(36); }
+const bagOf = key => bags[key]?.bagPhoto || null;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(()=> t.hidden = true, 3200); }
+
+/* ---------- chips ---------- */
+function makeChips(id, opts, cls, render){
+  const box = $(id);
+  box.innerHTML = Object.entries(opts).map(([v,l]) => render ? render(v,l) : `<button type="button" class="${cls}" data-v="${esc(v)}" aria-pressed="false">${esc(l)}</button>`).join('');
+  box.addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    box.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed','false'));
+    if (on) b.setAttribute('aria-pressed','true');
+    touched = true; onFormChange(b.closest('[id]').id);
+  });
+}
+const getChip = id => $(id).querySelector('[aria-pressed="true"]')?.dataset.v || null;
+function setChip(id, v){ $(id).querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); }
+
+makeChips('#c-roast', Object.fromEntries(ROASTS.map(r=>[r,r])), 'chip');
+makeChips('#c-basket', Object.fromEntries(BASKETS.map(r=>[r,r])), 'chip');
+(() => { const box = $('#c-prep');
+  box.innerHTML = PREPS.map(v => `<button type="button" class="chip" data-v="${esc(v)}" aria-pressed="false">${esc(v)}</button>`).join('');
+  box.addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true')); touched = true; });
+})();
+const getPrep = () => [...$('#c-prep').querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.v);
+const setPrep = arr => $('#c-prep').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((arr||[]).includes(b.dataset.v))));
+makeChips('#c-taste', TASTES, 'chip');
+makeChips('#c-drink', Object.fromEntries(DRINKS.map(r=>[r,r])), 'chip');
+makeChips('#c-puck', PUCKS, '', (v,l) => `<button type="button" class="puck p-${v}" data-v="${v}" aria-pressed="false" title="${PUCK_HINT[v]}"><span class="disc"></span>${l}</button>`);
+
+/* ---------- steppers ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-step]'); if (!b) return;
+  const inp = document.getElementById(b.dataset.for), step = +b.dataset.step;
+  const cur = parseFloat((inp.value||'').replace(',','.'));
+  let next = (isFinite(cur) ? cur : 0) + step;
+  if (next < 0) next = 0;
+  inp.value = Math.abs(step) < 1 ? next.toFixed(1) : String(Math.round(next*10)/10);
+  touched = true; onFormChange(inp.id);
+});
+$('#form').addEventListener('input', e => { touched = true; onFormChange(e.target.id); });
+
+/* ---------- shot timer ---------- */
+let t0 = null, raf = null;
+function tick(){ $('#clock').textContent = ((performance.now()-t0)/1000).toFixed(1); raf = requestAnimationFrame(tick); }
+$('#timer-btn').addEventListener('click', () => {
+  const b = $('#timer-btn');
+  if (t0 == null){ t0 = performance.now(); b.textContent = 'Stop'; b.classList.add('running'); tick(); }
+  else { cancelAnimationFrame(raf); const s = (performance.now()-t0)/1000; t0 = null; $('#clock').textContent = s.toFixed(1);
+    $('#f-time').value = s.toFixed(1); b.textContent = 'Start'; b.classList.remove('running'); touched = true; onFormChange('f-time'); }
+});
+
+/* ---------- photo ---------- */
+async function shrink(file, max = 1400, q = 0.82){
+  try {
+    const url = URL.createObjectURL(file);
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement('canvas'); c.width = Math.round(img.naturalWidth*sc); c.height = Math.round(img.naturalHeight*sc);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
+    return blob || file;
+  } catch { return file; }
+}
+$('#f-photo').addEventListener('change', async e => {
+  const f = e.target.files?.[0]; if (!f) return;
+  const blob = await shrink(f);
+  if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url);
+  pendingPhoto = {blob, thumb: await shrink(blob, 240, 0.7), url: URL.createObjectURL(blob)};
+  showPhoto(pendingPhoto.url); e.target.value = ''; touched = true;
+});
+$('#f-bag').addEventListener('change', async e => {
+  const f = e.target.files?.[0]; if (!f) return;
+  const blob = await shrink(f);
+  if (pendingBag) URL.revokeObjectURL(pendingBag.url);
+  pendingBag = {blob, url: URL.createObjectURL(blob), key: beanKey($('#f-roaster').value, $('#f-bean').value)};
+  e.target.value = ''; renderBag();
+});
+function renderBag(){
+  const f = readForm(), key = beanKey(f.roaster, f.bean), has = !!(f.roaster || f.bean);
+  $('#bag-pick').hidden = !has;
+  if (!has) return;
+  if (pendingBag && pendingBag.key !== key){ URL.revokeObjectURL(pendingBag.url); pendingBag = null; }
+  const bag = bagOf(key);
+  $('#bag-prev').hidden = !pendingBag && !bag;
+  if (pendingBag){ $('#bag-prev').removeAttribute('data-gh'); $('#bag-prev').src = pendingBag.url; }
+  else if (bag && $('#bag-prev').dataset.gh !== bag){ $('#bag-prev').dataset.gh = bag; delete $('#bag-prev').dataset.ghDone; $('#bag-prev').removeAttribute('src'); hydrate($('#bag-pick')); }
+  const src = pendingBag || bag;
+  $('#bag-btn').firstChild.textContent = src ? 'Replace bag photo' : 'Add bag photo';
+}
+function showPhoto(src){
+  $('#photo-prev').hidden = !src; if (src) $('#photo-prev').src = src;
+  $('#photo-clear').hidden = !src;
+  $('#photo-btn').firstChild.textContent = src ? 'Retake photo' : 'Add puck photo';
+}
+$('#photo-clear').addEventListener('click', () => { if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url); pendingPhoto = null; keepPhoto = null; showPhoto(null); });
+
+/* ---------- form ---------- */
+function readForm(){
+  return {
+    machine: $('#f-machine').value.trim() || DEFAULT_MACHINE,
+    roaster: $('#f-roaster').value.trim(), bean: $('#f-bean').value.trim(),
+    roast: getChip('#c-roast'), roastDate: $('#f-roastdate').value || null,
+    grind: num('#f-grind'), innerBurr: num('#f-burr'), doseIn: num('#f-dose'), groundOut: num('#f-ground'),
+    time: num('#f-time'), yieldOut: num('#f-yield'),
+    puck: getChip('#c-puck'), taste: getChip('#c-taste'), drink: getChip('#c-drink'),
+    basket: getChip('#c-basket'), prep: getPrep(),
+    notes: $('#f-notes').value.trim()
+  };
+}
+function setVal(id, v){ $(id).value = v == null ? '' : v; }
+function fillSettings(s, full){
+  setVal('#f-machine', s.machine || DEFAULT_MACHINE);
+  setVal('#f-roaster', s.roaster); setVal('#f-bean', s.bean); setChip('#c-roast', s.roast);
+  setVal('#f-roastdate', s.roastDate); setVal('#f-grind', s.grind); setVal('#f-burr', s.innerBurr);
+  setVal('#f-dose', s.doseIn != null ? (+s.doseIn).toFixed(1) : ''); setChip('#c-drink', s.drink);
+  setChip('#c-basket', s.basket); setPrep(s.prep);
+  if (full){
+    setVal('#f-ground', s.groundOut != null ? (+s.groundOut).toFixed(1) : ''); setVal('#f-time', s.time); setVal('#f-yield', s.yieldOut);
+    setChip('#c-puck', s.puck); setChip('#c-taste', s.taste); setVal('#f-notes', s.notes);
+  } else {
+    ['#f-ground','#f-time','#f-yield','#f-notes'].forEach(i => setVal(i,'')); setChip('#c-puck',null); setChip('#c-taste',null);
+  }
+}
+function resetForm(){
+  editingId = null; touched = false; keepPhoto = null;
+  if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url); pendingPhoto = null; showPhoto(null);
+  $('#edit-banner').hidden = true; $('#save-btn').textContent = 'Save shot';
+  $('#clock').textContent = '0.0';
+  const last = shots[0];
+  if (last) fillSettings(last, false);
+  else { fillSettings({machine:DEFAULT_MACHINE, grind:15, doseIn:18, drink:'Espresso'}, false); }
+  $('#f-when').value = localDT(new Date());
+  onFormChange();
+}
+$('#cancel-edit').addEventListener('click', () => { resetForm(); location.hash = 'history'; });
+
+function onFormChange(id){
+  const f = readForm();
+  // live grind line
+  const g = [];
+  if (f.doseIn != null && f.groundOut != null){ const d = f.doseIn - f.groundOut; g.push(`Grinder retention <b>${fmt1(d)} g</b>`); }
+  $('#live-grind').innerHTML = g.join('');
+  const x = [];
+  const r = ratio(f);
+  if (r) x.push(`Ratio <b>1 : ${r.toFixed(1)}</b>`);
+  if (f.doseIn) x.push(`Target 1:2 = <b>${fmt1(f.doseIn*2)} g</b>`);
+  if (f.time != null) x.push(f.time < 25 ? `<span style="color:var(--soupy)">Fast for a 1:2 shot</span>` : f.time > 33 ? `<span style="color:var(--dry)">Slow for a 1:2 shot</span>` : `<span style="color:var(--firm)">In the 25–33 s window</span>`);
+  $('#live-ext').innerHTML = x.join('');
+  const dOff = daysOff($('#f-roastdate').value, $('#f-when').value || new Date());
+  $('#live-roast').innerHTML = dOff == null ? '' : `<span><b>${dOff}</b> days off roast</span>` +
+    (dOff < 5 ? ' <span style="color:var(--soupy)">Very fresh: can run fast and uneven</span>' : dOff > 45 ? ' <span style="color:var(--dry)">Older beans usually need a finer grind</span>' : '');
+  if (!id || id === 'f-roaster' || id === 'f-bean'){
+    if (id && !editingId){ const k = beanKey(f.roaster, f.bean); const prev = shots.find(s => beanKey(s.roaster,s.bean) === k);
+      if (prev && prev.roast) setChip('#c-roast', prev.roast);
+      if (prev && prev.roastDate) $('#f-roastdate').value = prev.roastDate; }
+    renderDial(); renderBag();
+  } else if (id === 'c-roast') renderDial();
+}
+
+/* ---------- dial-in logic ---------- */
+function score(s){
+  let p = 0;
+  if (s.puck === 'firm') p += 2; else if (s.puck === 'dry') p += 1;
+  if (s.time >= 25 && s.time <= 33) p += 2;
+  if (s.taste === 'balanced') p += 2; else if (s.taste) p -= 1;
+  const r = ratio(s); if (r && r >= 1.8 && r <= 2.5) p += 1;
+  if (s.puck === 'soupy') p -= 2;
+  return p;
+}
+function bestOf(list){ let b = null, bs = -99; for (const s of list){ const sc = score(s); if (sc > bs){ bs = sc; b = s; } } return bs >= 3 ? b : null; }
+function suggest(s){
+  if (!s) return null;
+  let g = s.grind, d = s.doseIn, why;
+  const t = s.time, fast = t != null && t < 25, slow = t != null && t > 33;
+  if (s.puck === 'soupy'){
+    if (fast){ g = g != null ? g - 2 : g; why = 'Soupy puck and a fast shot. Grind 2 steps finer.'; }
+    else { d = d != null ? d + 0.5 : d; why = 'Soupy puck means too much headspace above the coffee. Add 0.5 g to the basket.'; }
+  } else if (s.puck === 'wet'){
+    if (fast){ g = g != null ? g - 1 : g; why = 'Wet puck and fast. Grind 1 step finer.'; }
+    else { d = d != null ? d + 0.3 : d; why = 'Slightly wet puck. Add about 0.3 g.'; }
+  } else if (fast){ g = g != null ? g - 1 : g; why = 'Ran fast (under 25 s). Grind 1 step finer.'; }
+  else if (slow){ g = g != null ? g + 1 : g; why = 'Ran slow (over 33 s). Grind 1 step coarser.'; }
+  else if (s.taste === 'sour'){ g = g != null ? g - 1 : g; why = 'Tasted sour. Grind 1 step finer to extract more.'; }
+  else if (s.taste === 'bitter'){ g = g != null ? g + 1 : g; why = 'Tasted bitter. Grind 1 step coarser.'; }
+  else why = 'Last shot landed well. Repeat it.';
+  if (s.puck === 'soupy' && /^Single/.test(s.basket || '') && (s.doseIn || 0) > 14) why += ' Also check the basket: a single basket holds about 9–12 g.';
+  if (g != null) g = Math.max(1, Math.min(30, g));
+  if (d != null) d = Math.round(d*10)/10;
+  return {g, d, why};
+}
+function shotLine(s){
+  const parts = [];
+  if (s.grind != null) parts.push(`G${fmt1(s.grind)}${s.innerBurr != null ? '/'+fmt1(s.innerBurr) : ''}`);
+  if (s.doseIn != null || s.yieldOut != null) parts.push(`${fmt1(s.doseIn)} → ${fmt1(s.yieldOut)} g`);
+  if (s.time != null) parts.push(`${fmt1(s.time)} s`);
+  const r = ratio(s); if (r) parts.push(`1:${r.toFixed(1)}`);
+  return parts.join(' · ');
+}
+function renderDial(){
+  const f = readForm(), box = $('#dial');
+  if (!f.roaster && !f.bean){ box.hidden = true; return; }
+  const list = shots.filter(s => beanKey(s.roaster,s.bean) === beanKey(f.roaster,f.bean) && s.id !== editingId);
+  box.hidden = false;
+  if (!list.length){
+    const start = {Light:11, 'Medium-light':12, Medium:14, 'Medium-dark':15, Dark:16}[f.roast] ?? 14;
+    box.innerHTML = `<div class="eyebrow">New bean</div>
+      <div>No shots with this bean yet. A good first shot on the Barista Pro: grind <b class="k">${start}</b>, <b class="k">18 g</b> in, aim for <b class="k">36 g</b> out in 25–30 s.${f.roast ? '' : ' Pick the roast and the starting grind adjusts.'}</div>
+      <div><button type="button" class="btn small" id="use-start">Use grind ${start}, 18 g</button></div>`;
+    $('#use-start').onclick = () => { setVal('#f-grind', start); setVal('#f-dose','18.0'); touched = true; onFormChange('f-grind'); };
+    return;
+  }
+  const last = list[0], sug = suggest(last), best = bestOf(list);
+  let h = `<div class="eyebrow">This bean · ${list.length} shot${list.length>1?'s':''}</div>
+    <div>Last (${esc(fmtDay(last.ts))}): <span class="k">${esc(shotLine(last))}</span>${last.puck ? ` · <span class="tag p-${last.puck}">${PUCKS[last.puck]}</span>` : ''}</div>
+    <div class="tip">${esc(sug.why)}</div>`;
+  if (best && best !== last) h += `<div>Best so far: <span class="k">${esc(shotLine(best))}</span> <span class="muted">(${esc(fmtDay(best.ts))})</span></div>`;
+  const btns = [];
+  if (sug.g != null || sug.d != null) btns.push(`<button type="button" class="btn small primary" id="use-sug">Use ${sug.g != null ? 'G'+fmt1(sug.g) : ''}${sug.g != null && sug.d != null ? ', ' : ''}${sug.d != null ? fmt1(sug.d)+' g' : ''}</button>`);
+  if (best && best !== last) btns.push(`<button type="button" class="btn small" id="use-best">Use best</button>`);
+  if (btns.length) h += `<div class="actions">${btns.join('')}</div>`;
+  box.innerHTML = h;
+  if ($('#use-sug')) $('#use-sug').onclick = () => { if (sug.g != null) setVal('#f-grind', sug.g); if (sug.d != null) setVal('#f-dose', sug.d.toFixed(1)); touched = true; onFormChange('f-grind'); toast('Settings filled in'); };
+  if ($('#use-best')) $('#use-best').onclick = () => { setVal('#f-grind', best.grind); setVal('#f-burr', best.innerBurr); if (best.doseIn != null) setVal('#f-dose', (+best.doseIn).toFixed(1)); touched = true; onFormChange('f-grind'); toast('Best settings filled in'); };
+}
+
+/* ---------- save ---------- */
+$('#form').addEventListener('submit', async e => {
+  e.preventDefault();
+  if (!connected){ toast('Connect your GitHub data repo first. Tap the status at the top.'); return; }
+  const f = readForm();
+  if (!f.roaster && !f.bean){ toast('Add the roaster or bean so you can compare shots later.'); $('#f-roaster').focus(); return; }
+  const btn = $('#save-btn'); btn.disabled = true; btn.textContent = 'Saving…';
+  let photo = keepPhoto || null;
+  let thumbPath = keepPhoto ? (shots.find(x => x.photo === keepPhoto)?.thumb || null) : null;
+  if (pendingPhoto){
+    try {
+      const id = newId();
+      photo = await store.uploadFile(`photos/${id}.jpg`, pendingPhoto.blob, pendingPhoto.url);
+      if (pendingPhoto.thumb) thumbPath = await store.uploadFile(`photos/${id}-t.jpg`, pendingPhoto.thumb);
+    } catch (err){ toast(`The photo didn’t upload (${errText(err)}). Saving the shot without it.`); photo = keepPhoto || null; }
+  }
+  let bagSaved = null;
+  if (pendingBag && pendingBag.key === beanKey(f.roaster, f.bean)){
+    try { bagSaved = {key: pendingBag.key, roaster: f.roaster, bean: f.bean, bagPhoto: await store.uploadFile(`photos/bag-${newId()}.jpg`, pendingBag.blob, pendingBag.url), updated: new Date().toISOString()}; pendingBag = null; }
+    catch (err){ toast(`The bag photo didn’t save (${errText(err)}). Saving the shot without it.`); }
+  }
+  const whenV = $('#f-when').value, when = whenV ? new Date(whenV) : new Date();
+  const id = editingId || newId();
+  const doc = {...f, id, ts: when.toISOString(), date: localDate(when), photo, thumb: photo ? thumbPath : null, example: false};
+  try {
+    setSync('busy');
+    await store.change(editingId ? 'Edit shot' : 'Log shot', data => {
+      data.shots = data.shots.filter(x => x.id !== id); data.shots.push(doc);
+      if (bagSaved) data.beans[bagSaved.key] = bagSaved;
+    });
+    applyData(); setSync('ok');
+    toast(editingId ? 'Shot updated' : 'Shot saved');
+    resetForm(); location.hash = 'history';
+  } catch (err){
+    toast(`Couldn’t save the shot (${errText(err)}). Check your connection and try again.`); setSync('bad', 'Not saved'); store.load().then(applyData).catch(()=>{});
+  } finally { btn.disabled = false; if (!editingId) btn.textContent = 'Save shot'; }
+});
+
+/* ---------- history ---------- */
+function thumb(s){
+  if (s.photo) return `<img class="thumb" data-gh="${esc(s.thumb || s.photo)}" alt="">`;
+  return `<span class="thumb disc" style="--c:var(--${s.puck || 'line'})"></span>`;
+}
+function beanOptions(sel, withAll){
+  const seen = new Map();
+  for (const s of shots){ const k = beanKey(s.roaster,s.bean); if (!seen.has(k)) seen.set(k, {name: beanName(s), n:0}); seen.get(k).n++; }
+  const cur = sel.value;
+  sel.innerHTML = (withAll ? `<option value="">All beans (${shots.length} shots)</option>` : '') +
+    [...seen].map(([k,v]) => `<option value="${esc(k)}">${esc(v.name)} (${v.n})</option>`).join('');
+  if ([...sel.options].some(o => o.value === cur)) sel.value = cur;
+  return seen;
+}
+function renderHistory(){
+  beanOptions($('#h-bean'), true);
+  const k = $('#h-bean').value, list = k ? shots.filter(s => beanKey(s.roaster,s.bean) === k) : shots;
+  const box = $('#h-list');
+  if (!list.length){ box.innerHTML = `<div class="empty"><h2>No shots yet</h2><div>Pull your morning shot, then log it on the Log shot tab. Every shot you save shows up here, newest first.</div><a class="btn primary" href="#log">Log a shot</a></div>`; return; }
+  const days = new Map();
+  for (const s of list){ const d = s.date || s.ts.slice(0,10); if (!days.has(d)) days.set(d, []); days.get(d).push(s); }
+  box.innerHTML = [...days].map(([d, arr]) => `<div class="day"><div class="eyebrow">${esc(fmtDay(arr[0].ts))}</div>${arr.map(s => `
+    <button class="shot" type="button" data-id="${esc(s.id)}">${thumb(s)}
+      <div><div class="t">${esc(s.drink || 'Shot')} · ${esc(beanName(s))}</div><div class="k">${esc(shotLine(s))}</div><div class="s">${esc(fmtTime(s.ts))}${s.machine && s.machine !== DEFAULT_MACHINE ? ' · ' + esc(s.machine) : ''}</div></div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">${s.puck ? `<span class="tag p-${s.puck}">${PUCKS[s.puck]}</span>` : ''}${s.example ? '<span class="tag ex">Example</span>' : ''}</div>
+    </button>`).join('')}</div>`).join('');
+}
+$('#h-bean').addEventListener('change', () => { renderHistory(); hydrate(); });
+$('#h-list').addEventListener('click', e => { const b = e.target.closest('.shot'); if (b) openSheet(b.dataset.id); });
+
+/* ---------- detail sheet ---------- */
+function openSheet(id){
+  const s = shots.find(x => x.id === id); if (!s) return;
+  const kv = [['Grind', s.grind], ['Inner burr', s.innerBurr], ['Beans in', s.doseIn != null ? fmt1(s.doseIn)+' g' : null],
+    ['Out of grinder', s.groundOut != null ? fmt1(s.groundOut)+' g' : null], ['Time', s.time != null ? fmt1(s.time)+' s' : null],
+    ['Espresso out', s.yieldOut != null ? fmt1(s.yieldOut)+' g' : null], ['Ratio', ratio(s) ? '1:'+ratio(s).toFixed(1) : null],
+    ['Puck', s.puck ? PUCKS[s.puck] : null], ['Taste', s.taste ? TASTES[s.taste] : null], ['Basket', s.basket],
+    ['Puck prep', (s.prep||[]).length ? s.prep.join(', ') : null], ['Roast', s.roast], ['Roast date', s.roastDate],
+    ['Days off roast', daysOff(s.roastDate, s.ts)], ['Machine', s.machine]];
+  const bag = bagOf(beanKey(s.roaster, s.bean));
+  $('#sheet-panel').innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+      <div><div class="eyebrow">${esc(fmtDay(s.ts))} · ${esc(fmtTime(s.ts))}${s.example ? ' · Example' : ''}</div><h2>${esc(s.drink || 'Shot')} · ${esc(beanName(s))}</h2></div>
+      <button class="btn small" type="button" id="sh-close">Close</button></div>
+    ${s.photo ? `<img class="big" data-gh="${esc(s.photo)}" alt="Puck photo">` : ''}
+    <div class="kv">${kv.filter(([,v]) => v != null && v !== '').map(([k,v]) => `<div><span>${k}</span><b>${esc(v)}</b></div>`).join('')}</div>
+    ${s.notes ? `<div>${esc(s.notes)}</div>` : ''}
+    ${bag ? `<div><div class="eyebrow" style="margin-bottom:6px">Bag</div><img class="big" data-gh="${esc(bag)}" alt="Bag of beans" style="max-height:260px;object-fit:contain;background:var(--soft)"></div>` : ''}
+    <div class="actions"><button class="btn primary" type="button" id="sh-again">Brew again with these settings</button>
+      <button class="btn" type="button" id="sh-edit">Edit</button><button class="btn danger" type="button" id="sh-del">Delete</button></div>`;
+  $('#sheet').hidden = false; hydrate($('#sheet'));
+  $('#sh-close').onclick = closeSheet;
+  $('#sh-again').onclick = () => { closeSheet(); resetForm(); fillSettings(s, false); $('#f-when').value = localDT(new Date()); touched = true; onFormChange(); location.hash = 'log'; toast('Settings copied. Pull the shot, then fill in the results.'); };
+  $('#sh-edit').onclick = () => { closeSheet(); resetForm(); editingId = s.id; keepPhoto = s.photo || null; fillSettings(s, true);
+    $('#f-when').value = localDT(new Date(s.ts)); showPhoto(null); if (s.photo) ghImg(s.photo).then(showPhoto).catch(()=>{});
+    $('#edit-banner').hidden = false; $('#save-btn').textContent = 'Save changes'; touched = true; onFormChange(); location.hash = 'log'; };
+  $('#sh-del').onclick = async e => {
+    const b = e.currentTarget;
+    if (!b.dataset.armed){ b.dataset.armed = '1'; b.textContent = 'Tap again to delete'; return; }
+    b.disabled = true;
+    try { await store.change('Delete shot', data => { data.shots = data.shots.filter(x => x.id !== s.id); }); applyData(); closeSheet(); toast('Shot deleted');
+      if (s.photo) store.deleteFile(s.photo); if (s.thumb) store.deleteFile(s.thumb); }
+    catch (err){ b.disabled = false; toast(`Couldn’t delete (${errText(err)}).`); }
+  };
+}
+function closeSheet(){ $('#sheet').hidden = true; }
+$('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet') closeSheet(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+
+/* ---------- stats ---------- */
+function streak(){
+  const days = new Set(shots.map(s => s.date || s.ts.slice(0,10)));
+  let d = new Date(), n = 0;
+  if (!days.has(localDate(d))) d.setDate(d.getDate()-1);
+  while (days.has(localDate(d))){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+function renderStats(){
+  const now = Date.now(), wk = shots.filter(s => now - new Date(s.ts) < 7*864e5).length;
+  const recent = shots.filter(s => now - new Date(s.ts) < 14*864e5 && s.puck);
+  const good = recent.length ? Math.round(100 * recent.filter(s => s.puck === 'firm').length / recent.length) + '%' : '–';
+  $('#tiles').innerHTML = [[shots.length,'shots logged'],[wk,'in the last 7 days'],[streak(),'day streak'],[good,'firm pucks, last 14 days']]
+    .map(([v,l]) => `<div class="tile"><b>${esc(v)}</b><span>${l}</span></div>`).join('');
+
+  const beans = beanOptions($('#s-bean'), false);
+  const body = $('#s-bean-body');
+  if (!shots.length){ body.innerHTML = `<div class="empty" style="padding:12px">Log a few shots and this shows which grind and dose worked for each bean.</div>`; }
+  else {
+    const k = $('#s-bean').value || [...beans.keys()][0];
+    const list = shots.filter(s => beanKey(s.roaster,s.bean) === k);
+    const best = bestOf(list);
+    const soupy = list.filter(s => s.puck === 'soupy').length;
+    const bag = bagOf(k);
+    body.innerHTML = `
+      ${bag ? `<div style="display:flex;gap:12px;align-items:center"><img class="bagimg" data-gh="${esc(bag)}" alt="Bag of beans"><span class="muted">${esc(list[0]?.roast || '')}${list[0]?.roastDate ? ' · roasted ' + esc(list[0].roastDate) : ''}</span></div>` : ''}
+      ${best ? `<div><div class="eyebrow" style="margin-bottom:6px">Best settings for this bean (${esc(fmtDay(best.ts))})</div>
+        <div class="best"><div><b>${fmt1(best.grind)}${best.innerBurr != null ? '/'+fmt1(best.innerBurr) : ''}</b><span>grind</span></div><div><b>${fmt1(best.doseIn)} g</b><span>in</span></div>
+        <div><b>${fmt1(best.yieldOut)} g</b><span>out</span></div><div><b>${fmt1(best.time)} s</b><span>time</span></div></div></div>`
+        : `<div class="muted">No dialed-in shot yet. A firm puck at 25–33 s marks one.</div>`}
+      <div class="muted" style="font-size:13px">${list.length} shot${list.length>1?'s':''} · ${soupy} soupy · avg ratio ${avg(list.map(ratio)) ? '1:' + avg(list.map(ratio)).toFixed(1) : '–'}</div>
+      <div><div class="eyebrow" style="margin-bottom:6px">Grind vs extraction time</div><div class="chart">${scatter(list)}</div>
+      <div class="legend">${Object.entries(PUCKS).map(([v,l]) => `<span style="--c:var(--${v})"><i></i>${l}</span>`).join('')}<span><i style="--c:var(--soft);border-radius:2px"></i>25–33 s target</span></div></div>
+      <div><div class="eyebrow" style="margin-bottom:6px">Shots with this bean</div><div class="tablewrap"><table>
+        <tr><th>Date</th><th>Grind</th><th>In</th><th>Out</th><th>Time</th><th>Ratio</th><th>Puck</th></tr>
+        ${list.slice(0,15).map(s => `<tr><td>${esc(fmtDay(s.ts))}</td><td class="n">${fmt1(s.grind)}</td><td class="n">${fmt1(s.doseIn)}</td><td class="n">${fmt1(s.yieldOut)}</td><td class="n">${fmt1(s.time)}</td><td class="n">${ratio(s) ? ratio(s).toFixed(1) : '–'}</td><td>${s.puck ? `<span class="tag p-${s.puck}">${PUCKS[s.puck]}</span>` : '–'}</td></tr>`).join('')}
+      </table></div></div>`;
+  }
+
+  // all beans table
+  const rows = [...beans.keys()].map(k => {
+    const l = shots.filter(s => beanKey(s.roaster,s.bean) === k), b = bestOf(l);
+    return `<tr><td>${esc(beanName(l[0]))}</td><td>${esc(l[0].roast || '–')}</td><td class="n">${l.length}</td><td class="n">${b ? fmt1(b.grind) : '–'}</td><td class="n">${b ? fmt1(b.doseIn) : '–'}</td><td class="n">${Math.round(100*l.filter(s=>s.puck==='soupy').length/l.length)}%</td></tr>`;
+  });
+  $('#s-table').innerHTML = rows.length ? `<tr><th>Bean</th><th>Roast</th><th>Shots</th><th>Best grind</th><th>Best dose</th><th>Soupy</th></tr>${rows.join('')}` : `<tr><td class="muted">No beans yet</td></tr>`;
+
+  // drinks
+  const dc = {}; shots.forEach(s => { const d = s.drink || 'Not set'; dc[d] = (dc[d]||0) + 1; });
+  const ent = Object.entries(dc).sort((a,b) => b[1]-a[1]), mx = Math.max(1, ...ent.map(e => e[1]));
+  $('#s-drinks').innerHTML = ent.length ? ent.map(([d,n]) => `<div class="bar"><span>${esc(d)}</span><div class="track"><div class="fill" style="width:${100*n/mx}%"></div></div><span class="num">${n}</span></div>`).join('') : `<div class="muted">No drinks yet</div>`;
+}
+$('#s-bean').addEventListener('change', () => { renderStats(); hydrate(); });
+function avg(a){ a = a.filter(x => x != null && isFinite(x)); return a.length ? a.reduce((p,c) => p+c, 0) / a.length : null; }
+function scatter(list){
+  const pts = list.filter(s => s.grind != null && s.time != null);
+  const W = 340, H = 200, L = 30, R = 10, T = 10, B = 28;
+  if (!pts.length) return `<div class="muted" style="font-size:13px">Shots with both a grind setting and a time show up here.</div>`;
+  let gmin = Math.min(...pts.map(s => s.grind)) - 1, gmax = Math.max(...pts.map(s => s.grind)) + 1;
+  if (gmax - gmin < 4){ const m = (gmin+gmax)/2; gmin = Math.floor(m-2); gmax = Math.ceil(m+2); }
+  const tmax = Math.max(45, Math.ceil((Math.max(...pts.map(s => s.time)) + 5) / 5) * 5);
+  const x = g => L + (g - gmin) / (gmax - gmin) * (W - L - R), y = t => T + (1 - t / tmax) * (H - T - B);
+  let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Grind setting against extraction time">`;
+  s += `<rect x="${L}" y="${y(33)}" width="${W-L-R}" height="${y(25)-y(33)}" fill="var(--soft)"/>`;
+  for (let t = 0; t <= tmax; t += 15) s += `<line x1="${L}" x2="${W-R}" y1="${y(t)}" y2="${y(t)}" stroke="var(--line)" stroke-width="1"/><text x="${L-5}" y="${y(t)+3}" text-anchor="end">${t}s</text>`;
+  const step = (gmax - gmin) > 12 ? 2 : 1;
+  for (let g = Math.ceil(gmin); g <= gmax; g += step) s += `<text x="${x(g)}" y="${H-12}" text-anchor="middle">${g}</text>`;
+  s += `<text x="${(L+W-R)/2}" y="${H-1}" text-anchor="middle">grind setting (finer ←  → coarser)</text>`;
+  const seen = {};
+  [...pts].reverse().forEach((p, i, arr) => {
+    const key = p.grind + '|' + Math.round(p.time); const off = (seen[key] = (seen[key]||0) + 1) - 1;
+    const last = i === arr.length - 1;
+    s += `<circle cx="${x(p.grind) + off*5}" cy="${y(p.time)}" r="${last ? 7 : 5.5}" fill="var(--${p.puck || 'muted'})" stroke="var(--surface)" stroke-width="${last ? 2.5 : 1.5}"><title>${esc(fmtDay(p.ts))}: G${p.grind}, ${p.time}s${p.puck ? ', ' + PUCKS[p.puck] : ''}</title></circle>`;
+  });
+  return s + `</svg>`;
+}
+
+/* ---------- export ---------- */
+function toCSV(){
+  const cols = ['ts','machine','roaster','bean','roast','roastDate','daysOffRoast','grind','innerBurr','doseIn','groundOut','time','yieldOut','ratio','puck','taste','basket','prep','drink','notes'];
+  const cell = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
+  const rows = [...shots].filter(s => !s.example).reverse().map(s => cols.map(c =>
+    c === 'ratio' ? (ratio(s) ? ratio(s).toFixed(2) : '') : c === 'prep' ? (s.prep||[]).join('; ') : c === 'daysOffRoast' ? daysOff(s.roastDate, s.ts) : s[c]).map(cell).join(','));
+  return [cols.join(','), ...rows].join('\n');
+}
+$('#export-btn').addEventListener('click', async () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([toCSV()], {type:'text/csv'}));
+  a.download = `shot-log-${localDate(new Date())}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+
+/* ---------- examples ---------- */
+$$('.rm-ex').forEach(b => b.addEventListener('click', async () => {
+  b.disabled = true;
+  try { await store.change('Remove examples', data => { data.shots = data.shots.filter(x => !x.example); }); applyData(); toast('Examples removed'); }
+  catch (err){ toast(`Couldn’t remove them (${errText(err)}).`); }
+  b.disabled = false;
+}));
+
+/* ---------- render / routing ---------- */
+function datalists(){
+  const uniq = f => [...new Set(shots.map(f).filter(Boolean))];
+  $('#dl-roaster').innerHTML = uniq(s => s.roaster).map(v => `<option value="${esc(v)}">`).join('');
+  $('#dl-bean').innerHTML = uniq(s => s.bean).map(v => `<option value="${esc(v)}">`).join('');
+  $('#dl-machine').innerHTML = [...new Set([DEFAULT_MACHINE, ...uniq(s => s.machine)])].map(v => `<option value="${esc(v)}">`).join('');
+}
+function renderAll(){
+  datalists();
+  const hasEx = shots.some(s => s.example);
+  $$('.ex-banner').forEach(b => b.hidden = !hasEx);
+  renderHistory(); renderStats(); renderDial(); renderBag(); hydrate();
+}
+function route(){
+  const setup = !store.cfg?.token;
+  $('#view-setup').hidden = !setup; $('.tabs').hidden = setup;
+  const v = setup ? null : ['log','history','stats'].includes(location.hash.slice(1)) ? location.hash.slice(1) : 'log';
+  ['log','history','stats'].forEach(n => $('#view-' + n).hidden = n !== v);
+  $$('.tabs a').forEach(a => a.toggleAttribute('aria-current', a.dataset.v === v) || (a.dataset.v === v && a.setAttribute('aria-current','page')));
+  $$('.tabs a').forEach(a => a.dataset.v === v ? a.setAttribute('aria-current','page') : a.removeAttribute('aria-current'));
+  window.scrollTo(0,0);
+}
+window.addEventListener('hashchange', route);
+function setSync(state, extra){
+  const el = $('#sync'), t = el.querySelector('span');
+  el.className = 'sync' + (state === 'ok' ? ' ok' : state === 'bad' ? ' bad' : '');
+  t.textContent = {ok:'Synced', wait:'Connecting…', busy:'Saving…', offline:'Offline · saved copy', bad: extra || 'Not connected'}[state];
+}
+
+/* ---------- GitHub storage ---------- */
+const CFG_KEY = 'shotlog-gh', CACHE_KEY = 'shotlog-cache';
+const lsGet = k => { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+const lsDel = k => { try { localStorage.removeItem(k); } catch {} };
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const errText = e => e?.status === 401 ? 'key rejected' : e?.status === 403 ? 'no permission' : e?.status === 404 ? 'repo not found' : e?.status ? 'GitHub ' + e.status : 'offline';
+async function b64enc(blob){
+  const buf = new Uint8Array(await blob.arrayBuffer()); let out = '';
+  for (let i = 0; i < buf.length; i += 0x8000) out += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+  return btoa(out);
+}
+const b64decText = b64 => new TextDecoder().decode(Uint8Array.from(atob(b64.replace(/\s/g, '')), c => c.charCodeAt(0)));
+
+function exampleShots(){
+  const base = {machine: DEFAULT_MACHINE, roaster: 'Example Roasters', bean: 'House Blend', roast: 'Medium', roastDate: null, innerBurr: null, basket: 'Double', photo: null, thumb: null, example: true};
+  const d = n => { const t = new Date(); t.setDate(t.getDate() - n); t.setHours(7, 10, 0, 0); return t; };
+  const rd = localDate(d(18));
+  return [
+    {...base, id: 'example-1', grind: 15, doseIn: 17.5, groundOut: 17.2, time: 19, yieldOut: 40, puck: 'soupy', taste: 'sour', drink: 'Americano', prep: [], notes: 'Example: gushed fast, puck was soup.', d: 4},
+    {...base, id: 'example-2', grind: 13, doseIn: 17.5, groundOut: 17.3, time: 24, yieldOut: 38, puck: 'wet', taste: 'sour', drink: 'Americano', prep: ['WDT'], notes: 'Example: better, still a bit wet.', d: 3},
+    {...base, id: 'example-3', grind: 12, doseIn: 18, groundOut: 17.8, time: 28, yieldOut: 36.5, puck: 'firm', taste: 'balanced', drink: 'Latte', prep: ['WDT','Puck screen'], notes: 'Example: dialed in.', d: 2},
+    {...base, id: 'example-4', grind: 12, doseIn: 18, groundOut: 17.9, time: 30, yieldOut: 36, puck: 'firm', taste: 'balanced', drink: 'Espresso', prep: ['WDT','Puck screen'], notes: '', d: 1},
+  ].map(({d: n, ...x}) => ({...x, roastDate: rd, ts: d(n).toISOString(), date: localDate(d(n))}));
+}
+
+const store = {
+  cfg: lsGet(CFG_KEY), data: {shots: [], beans: {}}, sha: null, q: Promise.resolve(),
+  async api(path, opts = {}){
+    const headers = {Authorization: `Bearer ${this.cfg.token}`, Accept: opts.accept || 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'};
+    if (opts.body) headers['Content-Type'] = 'application/json';
+    const r = await fetch(`https://api.github.com/repos/${this.cfg.repo}${path ? '/' + path : ''}`, {method: opts.method || 'GET', body: opts.body, headers, cache: 'no-store'});
+    if (!r.ok){ const e = new Error('GitHub ' + r.status); e.status = r.status; throw e; }
+    return r;
+  },
+  enqueue(fn){ const p = this.q.then(fn, fn); this.q = p.catch(() => {}); return p; },
+  async load(){
+    try {
+      const j = await (await this.api('contents/data.json')).json();
+      let text = j.encoding === 'base64' && j.content ? b64decText(j.content) : null;
+      if (text == null) text = b64decText((await (await this.api('git/blobs/' + j.sha)).json()).content);
+      this.data = JSON.parse(text); this.sha = j.sha;
+    } catch (e){
+      if (e.status !== 404) throw e;
+      this.data = {shots: exampleShots(), beans: {}}; this.sha = null;
+      await this.write('Start shot log');
+    }
+    this.data.shots ||= []; this.data.beans ||= {};
+    lsSet(CACHE_KEY, this.data);
+    return this.data;
+  },
+  async write(msg){
+    const body = {message: msg, content: await b64enc(new Blob([JSON.stringify(this.data, null, 1)]))};
+    if (this.sha) body.sha = this.sha;
+    const r = await this.api('contents/data.json', {method: 'PUT', body: JSON.stringify(body)});
+    this.sha = (await r.json()).content.sha;
+    lsSet(CACHE_KEY, this.data);
+  },
+  change(msg, fn){
+    return this.enqueue(async () => {
+      fn(this.data);
+      try { await this.write(msg); }
+      catch (e){ if (e.status !== 409 && e.status !== 422) throw e; await this.load(); fn(this.data); await this.write(msg); }
+    });
+  },
+  uploadFile(path, blob, previewUrl){
+    return this.enqueue(async () => {
+      await this.api('contents/' + path, {method: 'PUT', body: JSON.stringify({message: 'Add photo', content: await b64enc(blob)})});
+      photoCache.set(path, Promise.resolve(previewUrl || URL.createObjectURL(blob)));
+      return path;
+    });
+  },
+  deleteFile(path){
+    return this.enqueue(async () => {
+      try { const j = await (await this.api('contents/' + path)).json();
+        await this.api('contents/' + path, {method: 'DELETE', body: JSON.stringify({message: 'Remove photo', sha: j.sha})}); } catch {}
+    });
+  },
+};
+
+const photoCache = new Map();
+function ghImg(path){
+  if (!photoCache.has(path)){
+    photoCache.set(path, store.api('contents/' + path, {accept: 'application/vnd.github.raw'})
+      .then(r => r.blob()).then(b => URL.createObjectURL(b))
+      .catch(e => { photoCache.delete(path); throw e; }));
+  }
+  return photoCache.get(path);
+}
+const io = 'IntersectionObserver' in window ? new IntersectionObserver(entries => entries.forEach(en => {
+  if (!en.isIntersecting) return; io.unobserve(en.target); loadImg(en.target);
+}), {rootMargin: '300px'}) : null;
+function loadImg(img){ const p = img.dataset.gh; ghImg(p).then(u => { if (img.dataset.gh === p) img.src = u; }).catch(() => { img.style.visibility = 'hidden'; }); }
+function hydrate(root = document){
+  if (!store.cfg?.token) return;
+  root.querySelectorAll('img[data-gh]').forEach(img => {
+    if (img.dataset.ghDone === img.dataset.gh) return; img.dataset.ghDone = img.dataset.gh;
+    io ? io.observe(img) : loadImg(img);
+  });
+}
+
+function applyData(){
+  shots = [...store.data.shots].sort((a, b) => b.ts < a.ts ? -1 : b.ts > a.ts ? 1 : 0);
+  bags = store.data.beans || {};
+  if (!prefilled && !touched && !editingId){ prefilled = true; resetForm(); }
+  renderAll();
+}
+
+async function sync(){
+  setSync('wait');
+  try { await store.load(); connected = true; applyData(); setSync('ok'); }
+  catch (e){
+    connected = false;
+    if (e.status === 401 || e.status === 403 || e.status === 404){ setSync('bad', e.status === 404 ? 'Repo not found' : 'Key rejected'); }
+    else { setSync('offline'); toast('You’re offline. Showing your last saved copy; saving needs a connection.'); }
+  }
+}
+
+$('#g-connect').addEventListener('click', async () => {
+  const repo = $('#g-repo').value.trim().replace(/^https?:\/\/github\.com\//, '').replace(/\/+$/, '').replace(/\.git$/, '');
+  const token = $('#g-token').value.trim();
+  const msg = $('#g-msg');
+  if (!/^[\w.-]+\/[\w.-]+$/.test(repo)){ msg.textContent = 'Enter the data repo as yourname/coffee-data.'; return; }
+  if (!token){ msg.textContent = 'Paste the key you generated on GitHub.'; return; }
+  const btn = $('#g-connect'); btn.disabled = true; msg.textContent = 'Checking…';
+  const prev = store.cfg; store.cfg = {repo, token};
+  try {
+    const info = await (await store.api('')).json();
+    if (!info.private){ msg.textContent = 'That repo is public, so anyone could read your log. Make it private on GitHub, then try again.'; store.cfg = prev; return; }
+    if (info.permissions && !info.permissions.push){ msg.textContent = 'The key can read the repo but not save to it. Set Contents to “Read and write”.'; store.cfg = prev; return; }
+    lsSet(CFG_KEY, store.cfg); $('#g-token').value = ''; msg.textContent = '';
+    route(); await sync(); toast('Connected. Your log now syncs to GitHub.');
+  } catch (e){
+    store.cfg = prev;
+    msg.textContent = e.status === 401 ? 'GitHub rejected that key. Copy it again and paste the whole thing.' :
+      e.status === 404 || e.status === 403 ? 'The key can’t open that repo. Check the repo name, and that the key has access to it.' :
+      'Couldn’t reach GitHub. Check your connection.';
+  } finally { btn.disabled = false; }
+});
+
+$('#sync').addEventListener('click', () => {
+  if (!store.cfg?.token){ route(); return; }
+  $('#sheet-panel').innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+      <div><div class="eyebrow">Sync</div><h2>Saved to GitHub</h2></div>
+      <button class="btn small" type="button" id="st-close">Close</button></div>
+    <div style="font-size:14px">Your shots and photos are stored in the private repo <b class="mono">${esc(store.cfg.repo)}</b>.</div>
+    <div class="actions"><button class="btn primary" type="button" id="st-sync">Sync now</button>
+      <a class="btn" href="https://github.com/${esc(store.cfg.repo)}" target="_blank" rel="noopener">Open repo</a>
+      <button class="btn danger" type="button" id="st-out">Disconnect this device</button></div>
+    <div class="muted" style="font-size:12px">Disconnecting removes the key from this device only. Your data stays on GitHub.</div>`;
+  $('#sheet').hidden = false;
+  $('#st-close').onclick = closeSheet;
+  $('#st-sync').onclick = async () => { closeSheet(); await sync(); if (connected) toast('Synced'); };
+  $('#st-out').onclick = e => {
+    const b = e.currentTarget;
+    if (!b.dataset.armed){ b.dataset.armed = '1'; b.textContent = 'Tap again to disconnect'; return; }
+    lsDel(CFG_KEY); lsDel(CACHE_KEY); store.cfg = null; store.data = {shots: [], beans: {}}; connected = false;
+    closeSheet(); applyData(); setSync('bad', 'Not connected'); route();
+  };
+});
+
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && connected && !editingId && !touched) sync(); });
+
+async function boot(){
+  $('#today').textContent = new Date().toLocaleDateString(undefined,{weekday:'long', day:'numeric', month:'short'});
+  const owner = location.hostname.endsWith('.github.io') ? location.hostname.split('.')[0] : '';
+  $('#g-repo').value = store.cfg?.repo || (owner ? owner + '/coffee-data' : '');
+  route(); resetForm(); renderAll();
+  if (!store.cfg?.token){ setSync('bad', 'Not connected'); return; }
+  const cached = lsGet(CACHE_KEY);
+  if (cached?.shots){ store.data = cached; applyData(); }
+  await sync();
+}
+boot();
+</script>
+
+</html>
