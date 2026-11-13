@@ -96,6 +96,14 @@ textarea{min-height:70px;resize:vertical}
 .photo-pick{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .bagimg{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 .multi .chip[aria-pressed="true"]{background:var(--accent-soft);color:var(--ink);border-color:var(--accent)}
+.scan{display:flex;flex-direction:column;gap:10px;background:var(--bg);border:1px solid var(--line);border-radius:var(--r);padding:12px;font-size:14px}
+.scan .found{display:flex;flex-direction:column;gap:4px}
+.scan .found b{font-weight:600}
+.scan .src{font-size:12px;color:var(--muted)}
+.lines{display:flex;flex-direction:column;gap:6px}
+.line{display:flex;align-items:center;gap:6px;border-top:1px solid var(--line);padding-top:6px}
+.line span{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px}
+.scanbtn{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .photo-pick img{width:72px;height:72px;object-fit:cover;border-radius:10px;border:1px solid var(--line)}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 14px;font-weight:500;font-size:14px;color:var(--ink)}
 .btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
@@ -207,7 +215,12 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
     <div class="banner" id="edit-banner" hidden><span>Editing a saved shot</span><button class="btn small" type="button" id="cancel-edit">Cancel edit</button></div>
     <form id="form" class="view" novalidate>
       <div class="card">
-        <header><h2>Beans</h2><span class="muted" style="font-size:13px">pick a past bean or type a new one</span></header>
+        <header><h2>Beans</h2><span class="muted" style="font-size:13px">scan the bag, pick a past bean, or type</span></header>
+        <div class="scanbtn">
+          <span class="btn primary filebtn" id="scan-btn">Scan bag<input type="file" id="f-scan" accept="image/*"></span>
+          <span class="muted" style="font-size:13px">Take a photo of the front of the bag. It fills in what it can read.</span>
+        </div>
+        <div class="scan" id="scan-box" hidden></div>
         <div class="row">
           <label class="f">Roaster<input type="text" id="f-roaster" list="dl-roaster" autocomplete="off" placeholder="e.g. Onyx"></label>
           <label class="f">Bean / blend<input type="text" id="f-bean" list="dl-bean" autocomplete="off" placeholder="e.g. Monarch"></label>
@@ -400,7 +413,9 @@ makeChips('#c-puck', PUCKS, '', (v,l) => `<button type="button" class="puck p-${
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-step]'); if (!b) return;
   const inp = document.getElementById(b.dataset.for), step = +b.dataset.step;
-  const cur = parseFloat((inp.value||'').replace(',','.'));
+  let cur = parseFloat((inp.value||'').replace(',','.'));
+  // out of grinder starts from the beans-in weight, so it only needs small nudges
+  if (inp.id === 'f-ground'){ groundEdited = true; if (!isFinite(cur)) cur = parseFloat(($('#f-dose').value||'').replace(',','.')); }
   let next = (isFinite(cur) ? cur : 0) + step;
   if (next < 0) next = 0;
   inp.value = Math.abs(step) < 1 ? next.toFixed(1) : String(Math.round(next*10)/10);
@@ -483,6 +498,7 @@ function fillSettings(s, full){
   setVal('#f-roastdate', s.roastDate); setVal('#f-grind', s.grind); setVal('#f-burr', s.innerBurr);
   setVal('#f-dose', s.doseIn != null ? (+s.doseIn).toFixed(1) : ''); setChip('#c-drink', s.drink);
   setChip('#c-basket', s.basket); setPrep(s.prep);
+  groundEdited = !!full && s.groundOut != null;
   if (full){
     setVal('#f-ground', s.groundOut != null ? (+s.groundOut).toFixed(1) : ''); setVal('#f-time', s.time); setVal('#f-yield', s.yieldOut);
     setChip('#c-puck', s.puck); setChip('#c-taste', s.taste); setVal('#f-notes', s.notes);
@@ -491,7 +507,7 @@ function fillSettings(s, full){
   }
 }
 function resetForm(){
-  editingId = null; touched = false; keepPhoto = null;
+  editingId = null; touched = false; keepPhoto = null; groundEdited = false;
   if (pendingPhoto) URL.revokeObjectURL(pendingPhoto.url); pendingPhoto = null; showPhoto(null);
   $('#edit-banner').hidden = true; $('#save-btn').textContent = 'Save shot';
   $('#clock').textContent = '0.0';
@@ -503,7 +519,15 @@ function resetForm(){
 }
 $('#cancel-edit').addEventListener('click', () => { resetForm(); location.hash = 'history'; });
 
+let groundEdited = false;
+function syncGround(id){
+  if (id === 'f-ground'){ groundEdited = $('#f-ground').value.trim() !== ''; return; }
+  if (groundEdited) return;
+  const d = $('#f-dose').value.trim();
+  if (d) $('#f-ground').value = d;
+}
 function onFormChange(id){
+  syncGround(id);
   const f = readForm();
   // live grind line
   const g = [];
@@ -827,6 +851,182 @@ function setSync(state, extra){
   el.className = 'sync' + (state === 'ok' ? ' ok' : state === 'bad' ? ' bad' : '');
   t.textContent = {ok:'Synced', wait:'Connecting…', busy:'Saving…', offline:'Offline · saved copy', bad: extra || 'Not connected'}[state];
 }
+
+/* ---------- bag scan (on-device text reading) ---------- */
+const KNOWN_ROASTERS = ['Onyx Coffee Lab','Onyx','Counter Culture','Intelligentsia','Stumptown','Blue Bottle','La Colombe','Lavazza','Illy','Peet\'s','Starbucks','Verve','Ritual','Heart','Sey','Coava','Black & White','Methodical','George Howell','Kicking Horse','Death Wish','Dunkin','Kirkland','Segafredo','Allegro','Philz','Equator','Sightglass','Four Barrel','Madcap','PERC','Passenger','Partners','Klatch','Temple','Dragonfly','Little Wolf','Tim Wendelboe','Square Mile','Proud Mary','Caribou','Volcanica','Lifeboost','Bones','Cuvee','Kuma','Olympia','Herkimer','Vivace','Lighthouse','Victrola','Elm','Caffe Vita','Ruby','Sweet Bloom','Corvus','Brandywine','Ceremony','Joe Coffee','Devocion','Cafe Grumpy','Variety','Toby\'s Estate','Parlor','Nossa Familia','Water Avenue','Heart Roasters','Duluth','Trade','Atlas','Equal Exchange','Tim Hortons','Folgers','Maxwell House','Eight O\'Clock','Dunkin\'','Bulletproof','Black Rifle','Cafe Bustelo','Kimbo','Pellini','Mauro','Caffe Vergnano','Gimoka','Hills Bros','Community Coffee','Seattle\'s Best','Tully\'s','Green Mountain','Newman\'s Own','Big Island','Stone Street','Spirit Animal','Prodigal','Rogue Wave','Subtext','Dak','April','Manhattan','Friedhats','Coffee Collective','La Cabra','Gardelli','Nomad','Right Side','Fiddlehead','Panther','Wonderstate','Metric','Halfwit','Dark Matter','Ipsento','Big Shoulders','Madcap','Higher Grounds','Bird Rock','Dear Green','Flower Child','Mostra','Bird & Wild','Oren\'s','Irving Farm','Sterling','Good Citizen','Cat & Cloud','Verve Coffee','Equator Coffees','Ritual Coffee','Grumpy','Kiss the Hippo','Square One'];
+// Roast levels for well-known coffees. Matched on roaster + product words; always shown as "from the built-in list" so you can check it.
+const KNOWN_COFFEES = [
+  ['onyx','monarch','Dark'],['onyx','southern weather','Medium'],['onyx','geometry','Light'],['onyx','tropical weather','Light'],
+  ['counter culture','hologram','Medium-light'],['counter culture','big trouble','Medium'],['counter culture','forty-six','Dark'],['counter culture','fast forward','Medium'],['counter culture','apollo','Light'],
+  ['stumptown','hair bender','Medium'],['stumptown','holler mountain','Medium'],['stumptown','homestead','Medium'],['stumptown','trapper creek','Dark'],
+  ['intelligentsia','black cat','Medium-dark'],['intelligentsia','house','Medium'],['intelligentsia','frequency','Medium'],['intelligentsia','el gallo','Medium'],
+  ['blue bottle','hayes valley','Dark'],['blue bottle','bella donovan','Medium'],['blue bottle','three africas','Medium-light'],['blue bottle','giant steps','Medium-dark'],['blue bottle','17ft ceiling','Medium-dark'],
+  ['la colombe','corsica','Dark'],['la colombe','nizza','Medium'],['la colombe','lyon','Medium'],['la colombe','monaco','Medium-dark'],['la colombe','phocea','Medium-dark'],
+  ['lavazza','super crema','Medium'],['lavazza','crema e gusto','Dark'],['lavazza','gran crema','Medium'],['lavazza','qualita rossa','Medium'],['lavazza','qualita oro','Medium'],['lavazza','espresso italiano','Medium'],['lavazza','gran espresso','Dark'],
+  ['illy','classico','Medium'],['illy','intenso','Dark'],['illy','forte','Dark'],
+  ['peet','major dickason','Dark'],['peet','big bang','Medium'],['peet','french roast','Dark'],['peet','house blend','Dark'],['peet','espresso forte','Dark'],
+  ['starbucks','espresso roast','Dark'],['starbucks','pike place','Medium'],['starbucks','blonde','Light'],['starbucks','veranda','Light'],['starbucks','french roast','Dark'],['starbucks','italian roast','Dark'],['starbucks','house blend','Medium'],['starbucks','sumatra','Dark'],['starbucks','breakfast blend','Medium'],
+  ['kicking horse','kick ass','Dark'],['kicking horse','cliff hanger','Medium'],['kicking horse','three sisters','Medium'],['kicking horse','grizzly claw','Dark'],['kicking horse','hola','Light'],
+  ['death wish','death wish','Dark'],['dunkin','original','Medium'],['kirkland','espresso','Dark'],['kirkland','house','Medium'],
+  ['verve','streetlevel','Medium'],['verve','sermon','Medium-dark'],['verve','buena vista','Medium-light'],['ritual','sweet tooth','Medium'],
+  ['philz','tesora','Medium'],['philz','jacob','Medium-dark'],['equator','eye opener','Medium'],['caribou','caribou blend','Medium'],
+  ['cafe bustelo','espresso','Dark'],['black rifle','silencer smooth','Medium'],['black rifle','beyond black','Dark'],['black rifle','just black','Medium'],
+  ['segafredo','intermezzo','Medium-dark'],['kimbo','espresso napoletano','Dark'],['seattle','post alley','Dark'],
+];
+const normTxt = x => (x || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’`]/g, "'").replace(/[^a-z0-9&' ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const MONTHS = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+function findRoastDate(text){
+  const t = text.toLowerCase().replace(/[|]/g, '/');
+  const now = Date.now(), ok = d => d && !isNaN(d) && d.getTime() < now + 2 * 864e5 && d.getTime() > now - 200 * 864e5;
+  const fix = y => (y < 100 ? 2000 + y : y);
+  const cands = [];
+  const near = /(roast(?:ed)?(?:\s*(?:on|date|day))?[\s:.#-]*)/g;
+  let m; const zones = [];
+  while ((m = near.exec(t))) zones.push(t.slice(m.index, m.index + 40));
+  for (const z of zones.length ? zones : [t]){
+    let r;
+    if ((r = z.match(/(\d{4})[-./](\d{1,2})[-./](\d{1,2})/))) cands.push(new Date(+r[1], +r[2] - 1, +r[3]));
+    if ((r = z.match(/(\d{1,2})\/(\d{1,2})\/(\d{2,4})/))) cands.push(new Date(fix(+r[3]), +r[1] - 1, +r[2]));
+    if ((r = z.match(/(\d{1,2})[.-](\d{1,2})[.-](\d{2,4})/))) cands.push(new Date(fix(+r[3]), +r[2] - 1, +r[1]));
+    if ((r = z.match(/([a-z]{3})[a-z]*\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{2,4})/)) && MONTHS.includes(r[1])) cands.push(new Date(fix(+r[3]), MONTHS.indexOf(r[1]), +r[2]));
+    if ((r = z.match(/(\d{1,2})(?:st|nd|rd|th)?\s+([a-z]{3})[a-z]*\.?,?\s+(\d{2,4})/)) && MONTHS.includes(r[2])) cands.push(new Date(fix(+r[3]), MONTHS.indexOf(r[2]), +r[1]));
+  }
+  const d = cands.find(ok);
+  return d ? localDate(d) : null;
+}
+function findRoastPrinted(text){
+  const t = ' ' + normTxt(text) + ' ';
+  const pats = [[/ medium ?dark /, 'Medium-dark'], [/ (medium ?light|light ?medium) /, 'Medium-light'], [/ (dark roast|french roast|italian roast|extra dark|espresso roast) /, 'Dark'],
+    [/ (light roast|blonde|filter roast) /, 'Light'], [/ medium roast /, 'Medium'], [/ roast ?level[: ]+(\w+)/, null]];
+  for (const [re, val] of pats){
+    const m = t.match(re); if (!m) continue;
+    if (val) return val;
+    const w = m[1]; const hit = ROASTS.find(r => normTxt(r).replace(/ /g,'') === w || normTxt(r).startsWith(w)); if (hit) return hit;
+  }
+  return null;
+}
+function lev(a, b){
+  const m = a.length, n = b.length; if (!m || !n) return m || n;
+  let prev = Array.from({length: n + 1}, (_, j) => j);
+  for (let i = 1; i <= m; i++){ const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+  return prev[n];
+}
+// true when the name appears in the text, allowing a letter or two misread
+function fuzzyHas(t, name){
+  const n = normTxt(name); if (!n) return false;
+  if (t.includes(' ' + n + ' ')) return true;
+  if (n.length < 5) return false;
+  const words = t.trim().split(' '), k = n.split(' ').length, allow = n.length >= 9 ? 2 : 1;
+  for (let i = 0; i + k <= words.length; i++){ if (lev(words.slice(i, i + k).join(' '), n) <= allow) return true; }
+  return false;
+}
+function parseBag(text, lines){
+  const t = ' ' + normTxt(text) + ' ';
+  const out = {roaster: null, bean: null, roast: null, roastDate: findRoastDate(text), src: {}};
+  // 1. your own beans: best match where both roaster and bean appear
+  const mine = new Map(); shots.forEach(s => { const k = beanKey(s.roaster, s.bean); if (!mine.has(k)) mine.set(k, s); });
+  let bestMine = null, bestScore = 0;
+  for (const s of mine.values()){
+    const r = normTxt(s.roaster), b = normTxt(s.bean);
+    const sc = (r && fuzzyHas(t, r) ? 2 : 0) + (b && fuzzyHas(t, b) ? 3 : 0);
+    if (sc > bestScore){ bestScore = sc; bestMine = s; }
+  }
+  if (bestMine && bestScore >= 3){
+    out.roaster = bestMine.roaster; out.bean = bestMine.bean; out.src.roaster = out.src.bean = 'matched one of your beans';
+    if (bestMine.roast){ out.roast = bestMine.roast; out.src.roast = 'from your past shots with this bean'; }
+  }
+  // 2. roaster from your past roasters, then the built-in list (longest name first)
+  if (!out.roaster){
+    const pool = [...new Set([...shots.map(s => s.roaster).filter(Boolean), ...KNOWN_ROASTERS])].sort((a, b) => b.length - a.length);
+    const hit = pool.find(r => normTxt(r).length > 2 && fuzzyHas(t, r));
+    if (hit){ out.roaster = hit; out.src.roaster = shots.some(s => s.roaster === hit) ? 'one of your roasters' : 'built-in roaster list'; }
+  }
+  // 3. bean from that roaster's past beans, then the built-in coffee list
+  if (out.roaster && !out.bean){
+    const nr = normTxt(out.roaster);
+    const past = shots.filter(s => normTxt(s.roaster) === nr && s.bean).find(s => fuzzyHas(t, s.bean));
+    if (past){ out.bean = past.bean; out.src.bean = 'one of your beans'; if (past.roast && !out.roast){ out.roast = past.roast; out.src.roast = 'from your past shots with this bean'; } }
+  }
+  const kc = KNOWN_COFFEES.find(([r, b]) => fuzzyHas(t, b) && (t.includes(r) || normTxt(out.roaster || '').includes(r)));
+  if (kc){
+    if (!out.bean){ out.bean = kc[1].replace(/\b\w/g, c => c.toUpperCase()); out.src.bean = 'built-in coffee list'; }
+    if (!out.roaster){ const r = KNOWN_ROASTERS.find(x => normTxt(x).includes(kc[0])); if (r){ out.roaster = r; out.src.roaster = 'built-in coffee list'; } }
+    if (!out.roast){ out.roast = kc[2]; out.src.roast = 'built-in coffee list (check the bag)'; }
+  }
+  // 4. roast printed on the bag wins over the built-in list
+  const printed = findRoastPrinted(text);
+  if (printed && out.src.roast !== 'from your past shots with this bean'){ out.roast = printed; out.src.roast = 'printed on the bag'; }
+  // 5. no bean yet: guess the biggest line that isn't the roaster or a stock phrase
+  if (!out.bean){
+    const skip = /roast|coffee|whole bean|net wt|oz\b|\bg\b|grams|origin|process|notes|tasting|elevation|varietal|altitude|lb\b|organic|fair trade/i;
+    const cand = lines.find(l => !skip.test(l.text) && (!out.roaster || !normTxt(l.text).includes(normTxt(out.roaster))) && /[a-z]{3}/i.test(l.text));
+    if (cand){ out.bean = cand.text.replace(/[^\p{L}\p{N}&' -]+/gu, ' ').replace(/\s+/g, ' ').trim().replace(/\b(\p{L})(\p{L}*)/gu, (_, a, b) => a + b.toLowerCase()); out.src.bean = 'biggest text on the bag (a guess)'; }
+  }
+  return out;
+}
+
+let tessP = null;
+function loadTess(){
+  return tessP ||= new Promise((res, rej) => {
+    if (window.Tesseract) return res(window.Tesseract);
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    sc.onload = () => res(window.Tesseract); sc.onerror = () => { tessP = null; rej(new Error('load')); };
+    document.head.appendChild(sc);
+  });
+}
+async function readBag(blob, onProgress){
+  const T = await loadTess();
+  const w = await T.createWorker('eng', 1, {logger: m => { if (m.status === 'recognizing text') onProgress(m.progress); }});
+  try {
+    const {data} = await w.recognize(blob);
+    const lines = (data.lines || []).map(l => ({text: (l.text || '').trim(), h: l.bbox ? l.bbox.y1 - l.bbox.y0 : 0, conf: l.confidence || 0}))
+      .filter(l => l.text.length >= 3 && l.conf >= 40 && (l.text.match(/[a-z]/gi) || []).length >= l.text.length * 0.5)
+      .sort((a, b) => b.h - a.h);
+    return {text: data.text || '', lines};
+  } finally { w.terminate(); }
+}
+
+$('#f-scan').addEventListener('change', async e => {
+  const f = e.target.files?.[0]; e.target.value = ''; if (!f) return;
+  const box = $('#scan-box'); box.hidden = false; touched = true;
+  box.innerHTML = `<div id="scan-status">Getting the photo ready…</div>`;
+  const btn = $('#scan-btn'); btn.classList.add('disabled'); $('#f-scan').disabled = true;
+  try {
+    const big = await shrink(f, 1800, 0.9);
+    const bagBlob = await shrink(f);
+    $('#scan-status').textContent = tessP ? 'Reading the bag…' : 'Loading the text reader (first time only, about 10 MB)…';
+    const res = await readBag(big, p => { const st = $('#scan-status'); if (st) st.textContent = `Reading the bag… ${Math.round(p * 100)}%`; });
+    const out = parseBag(res.text, res.lines);
+    if (out.roaster && normTxt(out.roaster) !== normTxt($('#f-roaster').value) && !out.bean) $('#f-bean').value = '';
+    if (out.roaster) $('#f-roaster').value = out.roaster;
+    if (out.bean) $('#f-bean').value = out.bean;
+    if (out.roast) setChip('#c-roast', out.roast);
+    if (out.roastDate) $('#f-roastdate').value = out.roastDate;
+    if (pendingBag) URL.revokeObjectURL(pendingBag.url);
+    pendingBag = {blob: bagBlob, url: URL.createObjectURL(bagBlob), key: beanKey($('#f-roaster').value, $('#f-bean').value)};
+    onFormChange('f-bean'); if (out.roast) setChip('#c-roast', out.roast); if (out.roastDate) $('#f-roastdate').value = out.roastDate; onFormChange('c-roast'); renderBag();
+    const row = (label, val, src) => `<div><b>${label}:</b> ${val ? esc(val) : '<span class="muted">not found</span>'}${val && src ? ` <span class="src">· ${esc(src)}</span>` : ''}</div>`;
+    box.innerHTML = `<div class="found"><div class="eyebrow">From the bag</div>
+        ${row('Roaster', out.roaster, out.src.roaster)}${row('Bean', out.bean, out.src.bean)}${row('Roast', out.roast, out.src.roast)}${row('Roast date', out.roastDate, out.roastDate ? 'printed on the bag' : '')}</div>
+      ${res.lines.length ? `<div class="lines"><div class="src">Wrong? Tap the text it read to use it instead:</div>
+        ${res.lines.slice(0, 8).map((l, i) => `<div class="line"><span>${esc(l.text)}</span><button type="button" class="btn small" data-use="roaster" data-i="${i}">Roaster</button><button type="button" class="btn small" data-use="bean" data-i="${i}">Bean</button></div>`).join('')}</div>`
+        : '<div class="muted">It couldn’t read any words. Try again closer, straight on, with good light.</div>'}
+      <div class="src">The bag photo is saved with the bean when you save the shot.</div>
+      <div><button type="button" class="btn small" id="scan-close">Done</button></div>`;
+    box.querySelectorAll('[data-use]').forEach(b => b.addEventListener('click', () => {
+      const v = res.lines[+b.dataset.i].text.replace(/\s+/g, ' ').trim();
+      $(b.dataset.use === 'roaster' ? '#f-roaster' : '#f-bean').value = v;
+      if (pendingBag) pendingBag.key = beanKey($('#f-roaster').value, $('#f-bean').value);
+      onFormChange(b.dataset.use === 'roaster' ? 'f-roaster' : 'f-bean');
+      toast(`${b.dataset.use === 'roaster' ? 'Roaster' : 'Bean'} set to “${v}”`);
+    }));
+    $('#scan-close').onclick = () => { box.hidden = true; };
+  } catch (err){
+    box.innerHTML = `<div>${err?.message === 'load' ? 'The text reader didn’t load. Check your connection and try again.' : 'Something went wrong reading that photo. Try another one.'}</div><div><button type="button" class="btn small" id="scan-close">Close</button></div>`;
+    $('#scan-close').onclick = () => { box.hidden = true; };
+  } finally { btn.classList.remove('disabled'); $('#f-scan').disabled = false; }
+});
 
 /* ---------- GitHub storage ---------- */
 const CFG_KEY = 'shotlog-gh', CACHE_KEY = 'shotlog-cache';
