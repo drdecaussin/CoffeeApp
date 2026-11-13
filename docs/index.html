@@ -59,6 +59,14 @@ button{cursor:pointer}
 
 .view{display:flex;flex-direction:column;gap:14px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.fold-h{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:0;text-align:left;cursor:pointer;color:inherit}
+.fold-h > div{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.fold-h .sum{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.fold-h .sum b{color:var(--ink);font-weight:600}
+.fold-h .chev{flex:0 0 32px;height:32px;border-radius:50%;background:var(--soft);display:grid;place-items:center;transition:transform .2s}
+.fold-h .chev::before{content:'';width:8px;height:8px;border-right:2px solid var(--ink);border-bottom:2px solid var(--ink);transform:translateY(-2px) rotate(45deg)}
+.fold-h[aria-expanded="true"] .chev{transform:rotate(180deg)}
+.fold-b{display:flex;flex-direction:column;gap:12px}
 .card > header{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .banner{background:var(--accent-soft);border-radius:var(--r);padding:10px 12px;font-size:14px;display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
 
@@ -226,7 +234,8 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
     <div class="banner" id="edit-banner" hidden><span>Editing a saved shot</span><button class="btn small" type="button" id="cancel-edit">Cancel edit</button></div>
     <form id="form" class="view" novalidate>
       <div class="card">
-        <header><h2>Beans</h2><span class="muted" style="font-size:13px">scan the bag, pick a past bean, or type</span></header>
+        <button type="button" class="fold-h" id="beans-h" aria-expanded="true" aria-controls="beans-b"><div><h2>Beans</h2><div class="sum" id="beans-sum"></div></div><span class="chev" aria-hidden="true"></span></button>
+        <div class="fold-b" id="beans-b">
         <div class="scanbtn">
           <span class="btn primary filebtn" id="scan-btn">Scan bag<input type="file" id="f-scan" accept="image/*"></span>
           <span class="muted" style="font-size:13px">Take a photo of the front of the bag. It fills in what it can read.</span>
@@ -244,6 +253,7 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
         <div class="photo-pick" id="bag-pick" hidden>
           <img id="bag-prev" class="bagimg" alt="Bag of beans" hidden>
           <span class="muted" style="font-size:13px" id="bag-note">Bag photo, saved with this bean. Scan the bag again to replace it.</span>
+        </div>
         </div>
         <div class="dial" id="dial" hidden></div>
       </div>
@@ -312,8 +322,9 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
         <label class="f">Notes<textarea id="f-notes" placeholder="Channeling, crema, what you changed…"></textarea></label>
       </div>
 
-      <div class="card">
-        <header><h2>Machine</h2><span class="muted" style="font-size:13px">carries over from your last shot</span></header>
+      <div class="card" id="machine-card">
+        <button type="button" class="fold-h" id="machine-h" aria-expanded="false" aria-controls="machine-b"><div><h2>Machine</h2><div class="sum" id="machine-sum"></div></div><span class="chev" aria-hidden="true"></span></button>
+        <div class="fold-b" id="machine-b" hidden>
         <label class="f">Machine<input type="text" id="f-machine" list="dl-machine" autocomplete="off"></label>
         <div class="row">
           <label class="f">Brew temperature <span class="unit">as set on the machine</span>
@@ -322,23 +333,22 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
             <select id="f-tempunit"><option value="F">°F</option><option value="C">°C</option></select></label>
         </div>
         <label class="f">When<input type="datetime-local" id="f-when"></label>
+              <div class="eyebrow" style="margin-top:6px">Cleaning</div>
+          <div class="cl-sum" id="cl-sum"></div>
+          <div id="cl-form" class="view" style="gap:10px" hidden>
+            <div class="chips multi" id="c-clean"></div>
+            <label class="f">When<input type="date" id="cl-date"></label>
+            <label class="f">Notes <span class="unit">optional</span><input type="text" id="cl-notes" placeholder="e.g. used Cafiza, 5 cycles"></label>
+            <div style="display:flex;gap:8px"><button type="button" class="btn primary" id="cl-save">Save cleaning</button><button type="button" class="btn" id="cl-cancel">Cancel</button></div>
+          </div>
+          <div><button type="button" class="btn" id="cl-open">Log a cleaning</button></div>
+          <div class="cl-list" id="cl-list"></div>
+        </div>
       </div>
 
       <button class="btn primary save" type="submit" id="save-btn">Save shot</button>
     </form>
 
-    <div class="card" id="clean-card">
-      <header><h2>Cleaning</h2><span class="muted" style="font-size:13px" id="cl-machine"></span></header>
-      <div class="cl-sum" id="cl-sum"></div>
-      <div id="cl-form" class="view" style="gap:10px" hidden>
-        <div class="chips multi" id="c-clean"></div>
-        <label class="f">When<input type="date" id="cl-date"></label>
-        <label class="f">Notes <span class="unit">optional</span><input type="text" id="cl-notes" placeholder="e.g. used Cafiza, 5 cycles"></label>
-        <div style="display:flex;gap:8px"><button type="button" class="btn primary" id="cl-save">Save cleaning</button><button type="button" class="btn" id="cl-cancel">Cancel</button></div>
-      </div>
-      <div><button type="button" class="btn" id="cl-open">Log a cleaning</button></div>
-      <div class="cl-list" id="cl-list"></div>
-    </div>
     <datalist id="dl-roaster"></datalist><datalist id="dl-bean"></datalist><datalist id="dl-machine"></datalist>
   </section>
 
@@ -552,6 +562,7 @@ function resetForm(){
   else { fillSettings({machine:DEFAULT_MACHINE, grind:15, doseIn:18, drink:'Espresso'}, false); }
   $('#f-when').value = localDT(new Date());
   onFormChange();
+  const f = readForm(); setFold('beans', !(f.roaster || f.bean)); setFold('machine', false);
 }
 $('#cancel-edit').addEventListener('click', () => { resetForm(); location.hash = 'history'; });
 
@@ -565,6 +576,7 @@ function syncGround(id){
 function onFormChange(id){
   syncGround(id);
   if (!id || id === 'f-machine') renderCleaning();
+  renderSums();
   const f = readForm();
   // live grind line
   const g = [];
@@ -702,6 +714,21 @@ $('#form').addEventListener('submit', async e => {
   } finally { btn.disabled = false; if (!editingId) btn.textContent = 'Save shot'; }
 });
 
+/* ---------- collapsible beans and machine ---------- */
+function setFold(name, open){ $(`#${name}-h`).setAttribute('aria-expanded', String(open)); $(`#${name}-b`).hidden = !open; }
+['beans', 'machine'].forEach(n => $(`#${n}-h`).addEventListener('click', () => setFold(n, $(`#${n}-h`).getAttribute('aria-expanded') !== 'true')));
+function renderSums(){
+  const f = readForm();
+  const dOff = daysOff(f.roastDate, $('#f-when').value || new Date());
+  const name = [f.roaster, f.bean].filter(Boolean).map(esc).join(' ');
+  $('#beans-sum').innerHTML = name ? `<b>${name}</b>${f.roast ? ' · ' + esc(f.roast) : ''}${dOff != null ? ` · ${dOff} days off roast` : ''}` : 'Scan the bag or type the bean';
+  const mk = f.machine.toLowerCase(), last = cleanings().find(c => (c.machine || DEFAULT_MACHINE).toLowerCase() === mk);
+  let cl = 'no cleanings logged';
+  if (last){ const days = Math.round((new Date(localDate(new Date()) + 'T00:00') - new Date(last.date + 'T00:00')) / 864e5); cl = `cleaned ${days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'}`; }
+  $('#machine-sum').innerHTML = `<b>${esc(f.machine)}</b>${f.temp != null ? ` · ${fmt1(f.temp)} °${esc(f.tempUnit || '')}` : ''} · ${cl}`;
+}
+$('#cl-notes').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); $('#cl-save').click(); } });
+
 /* ---------- cleaning log ---------- */
 const CLEANS = ['Backflush, water', 'Backflush, cleaning tablet', 'Descale', 'Shower screen', 'Steam wand', 'Grinder burrs', 'Water filter changed'];
 (() => { const box = $('#c-clean');
@@ -712,7 +739,6 @@ const cleanings = () => [...(store.data.cleanings || [])].sort((a, b) => b.date 
 function renderCleaning(){
   const machine = $('#f-machine').value.trim() || DEFAULT_MACHINE, mk = machine.toLowerCase();
   const list = cleanings().filter(c => (c.machine || DEFAULT_MACHINE).toLowerCase() === mk);
-  $('#cl-machine').textContent = machine;
   const today = new Date(localDate(new Date()) + 'T00:00');
   const rows = CLEANS.map(k => {
     const last = list.find(c => (c.kinds || []).includes(k)); if (!last) return '';
@@ -721,6 +747,7 @@ function renderCleaning(){
     return `<div>${esc(k)}</div><div class="m">${days === 0 ? 'today' : days === 1 ? '1 day ago' : days + ' days ago'} · ${since} shot${since === 1 ? '' : 's'} since</div>`;
   }).join('');
   $('#cl-sum').innerHTML = rows || '<div class="muted" style="grid-column:1/-1">No cleanings logged for this machine yet. Log one each time you backflush, descale or clean the grinder, and it shows how long it’s been.</div>';
+  renderSums();
   $('#cl-list').innerHTML = list.slice(0, 20).map(c => `<div class="cl-item"><div><div>${esc((c.kinds || []).join(', '))}</div><div class="s">${esc(new Date(c.date + 'T00:00').toLocaleDateString(undefined, {weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'}))}${c.notes ? ' · ' + esc(c.notes) : ''}</div></div><button type="button" class="btn small" data-cl-del="${esc(c.id)}">Delete</button></div>`).join('');
 }
 $('#cl-open').addEventListener('click', () => {
