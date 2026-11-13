@@ -326,11 +326,8 @@ td.n{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
         <button type="button" class="fold-h" id="machine-h" aria-expanded="false" aria-controls="machine-b"><div><h2>Machine</h2><div class="sum" id="machine-sum"></div></div><span class="chev" aria-hidden="true"></span></button>
         <div class="fold-b" id="machine-b" hidden>
         <label class="f">Machine<input type="text" id="f-machine" list="dl-machine" autocomplete="off"></label>
-        <div class="row">
-          <label class="f">Brew temperature <span class="unit">as set on the machine</span>
-            <div class="stepper"><button type="button" data-for="f-temp" data-step="-1" aria-label="Lower">−</button><input class="n" id="f-temp" inputmode="decimal"><button type="button" data-for="f-temp" data-step="1" aria-label="Higher">+</button></div></label>
-          <label class="f">Unit <span class="unit">&nbsp;</span>
-            <select id="f-tempunit"><option value="F">°F</option><option value="C">°C</option></select></label>
+        <div class="f" style="font-size:13px;color:var(--muted);font-weight:500;display:flex;flex-direction:column;gap:6px">Temperature setting <span class="unit" style="margin-top:-4px">the 1–5 number on the machine's temperature icon</span>
+          <div class="chips" id="c-temp"></div>
         </div>
         <label class="f">When<input type="datetime-local" id="f-when"></label>
               <div class="eyebrow" style="margin-top:6px">Cleaning</div>
@@ -455,6 +452,7 @@ const setIssues = arr => $('#c-issues').querySelectorAll('button').forEach(b => 
 const getPrep = () => [...$('#c-prep').querySelectorAll('[aria-pressed="true"]')].map(b => b.dataset.v);
 const setPrep = arr => $('#c-prep').querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String((arr||[]).includes(b.dataset.v))));
 makeChips('#c-taste', TASTES, 'chip');
+makeChips('#c-temp', {1:'1',2:'2',3:'3',4:'4',5:'5'}, 'chip');
 makeChips('#c-drink', Object.fromEntries(DRINKS.map(r=>[r,r])), 'chip');
 makeChips('#c-puck', PUCKS, '', (v,l) => `<button type="button" class="puck p-${v}" data-v="${v}" aria-pressed="false" title="${PUCK_HINT[v]}"><span class="disc"></span>${l}</button>`);
 
@@ -530,7 +528,7 @@ function readForm(){
     roast: getChip('#c-roast'), roastDate: $('#f-roastdate').value || null,
     grind: num('#f-grind'), innerBurr: num('#f-burr'), doseIn: num('#f-dose'), groundOut: num('#f-ground'),
     time: num('#f-time'), drip: num('#f-drip'), yieldOut: num('#f-yield'),
-    temp: num('#f-temp'), tempUnit: num('#f-temp') != null ? $('#f-tempunit').value : null,
+    temp: getChip('#c-temp') != null ? +getChip('#c-temp') : null,
     puck: getChip('#c-puck'), taste: getChip('#c-taste'), drink: getChip('#c-drink'),
     basket: getChip('#c-basket'), prep: getPrep(), issues: getIssues(),
     notes: $('#f-notes').value.trim()
@@ -543,7 +541,7 @@ function fillSettings(s, full){
   setVal('#f-roastdate', s.roastDate); setVal('#f-grind', s.grind); setVal('#f-burr', s.innerBurr);
   setVal('#f-dose', s.doseIn != null ? (+s.doseIn).toFixed(1) : ''); setChip('#c-drink', s.drink);
   setChip('#c-basket', s.basket); setPrep(s.prep);
-  setVal('#f-temp', s.temp); if (s.tempUnit) $('#f-tempunit').value = s.tempUnit;
+  setChip('#c-temp', s.temp != null && !s.tempUnit ? String(s.temp) : null);
   groundEdited = !!full && s.groundOut != null;
   if (full){
     setVal('#f-ground', s.groundOut != null ? (+s.groundOut).toFixed(1) : ''); setVal('#f-time', s.time); setVal('#f-drip', s.drip); setVal('#f-yield', s.yieldOut);
@@ -725,7 +723,7 @@ function renderSums(){
   const mk = f.machine.toLowerCase(), last = cleanings().find(c => (c.machine || DEFAULT_MACHINE).toLowerCase() === mk);
   let cl = 'no cleanings logged';
   if (last){ const days = Math.round((new Date(localDate(new Date()) + 'T00:00') - new Date(last.date + 'T00:00')) / 864e5); cl = `cleaned ${days === 0 ? 'today' : days === 1 ? 'yesterday' : days + ' days ago'}`; }
-  $('#machine-sum').innerHTML = `<b>${esc(f.machine)}</b>${f.temp != null ? ` · ${fmt1(f.temp)} °${esc(f.tempUnit || '')}` : ''} · ${cl}`;
+  $('#machine-sum').innerHTML = `<b>${esc(f.machine)}</b>${f.temp != null ? ` · temp ${f.temp}` : ''} · ${cl}`;
 }
 $('#cl-notes').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); $('#cl-save').click(); } });
 
@@ -814,7 +812,7 @@ function openSheet(id){
     ['Espresso out', s.yieldOut != null ? fmt1(s.yieldOut)+' g' : null], ['Ratio', ratio(s) ? '1:'+ratio(s).toFixed(1) : null],
     ['Puck', s.puck ? PUCKS[s.puck] : null], ['Taste', s.taste ? TASTES[s.taste] : null], ['Basket', s.basket],
     ['Shot problems', (s.issues||[]).length ? s.issues.map(i => ISSUES[i] || i).join(', ') : null], ['Puck prep', (s.prep||[]).length ? s.prep.join(', ') : null], ['Roast', s.roast], ['Roast date', s.roastDate],
-    ['Days off roast', daysOff(s.roastDate, s.ts)], ['Machine', s.machine], ['Brew temp', s.temp != null ? fmt1(s.temp)+' °'+(s.tempUnit||'') : null]];
+    ['Days off roast', daysOff(s.roastDate, s.ts)], ['Machine', s.machine], ['Temp setting', s.temp != null ? (s.tempUnit ? fmt1(s.temp)+' °'+s.tempUnit : s.temp + ' of 5') : null]];
   const bag = bagOf(beanKey(s.roaster, s.bean));
   $('#sheet-panel').innerHTML = `
     <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
@@ -923,7 +921,7 @@ function scatter(list){
 
 /* ---------- export ---------- */
 function toCSV(){
-  const cols = ['ts','machine','roaster','bean','roast','roastDate','daysOffRoast','grind','innerBurr','doseIn','groundOut','drip','time','yieldOut','temp','tempUnit','ratio','puck','issues','taste','basket','prep','drink','notes'];
+  const cols = ['ts','machine','roaster','bean','roast','roastDate','daysOffRoast','grind','innerBurr','doseIn','groundOut','drip','time','yieldOut','temp','ratio','puck','issues','taste','basket','prep','drink','notes'];
   const cell = v => { v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; };
   const rows = [...shots].filter(s => !s.example).reverse().map(s => cols.map(c =>
     c === 'ratio' ? (ratio(s) ? ratio(s).toFixed(2) : '') : c === 'prep' ? (s.prep||[]).join('; ') : c === 'issues' ? (s.issues||[]).join('; ') : c === 'daysOffRoast' ? daysOff(s.roastDate, s.ts) : s[c]).map(cell).join(','));
